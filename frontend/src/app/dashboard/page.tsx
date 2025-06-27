@@ -29,7 +29,7 @@ export default function DashboardPage() {
       return;
     }
 
-    const q = query(collection<Product>(db, 'products'), where('sellerId', '==', user.uid));
+    const q = query(collection(db, 'products'), where('sellerId', '==', user.uid));
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const productsData = querySnapshot.docs.map(doc => ({
         id: doc.id,
