@@ -7,3 +7,7 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+[functions]
+  directory = "frontend/netlify/functions"
+  node_bundler = "esbuild"

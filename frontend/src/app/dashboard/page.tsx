@@ -1,4 +1,3 @@
-'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { collection, query, where, onSnapshot, DocumentData, Timestamp } from 'firebase/firestore';
@@ -37,7 +36,7 @@ export default function DashboardPage() {
       setProducts(productsData);
       setIsLoadingProducts(false);
     }, (error) => {
-        console.error('상품 데이터 로딩 오류:', error);
+        console.error("상품 데이터 로딩 오류:", error);
         setIsLoadingProducts(false);
     });
 
