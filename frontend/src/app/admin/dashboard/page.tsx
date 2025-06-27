@@ -43,7 +43,7 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     if (isAdmin === false) return; // 관리자가 아니면 데이터 로드 안함
     if (isAdmin === true) {
-      const q = query(collection(db, 'products'));
+      const q = query(collection<Product>(db, 'products'));
       const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const productsData = querySnapshot.docs.map(doc => ({
           id: doc.id,
@@ -58,7 +58,7 @@ export default function AdminDashboardPage() {
 
   const handleStatusChange = async (productId: string, newStatus: string) => {
     try {
-      const productRef = doc(db, 'products', productId);
+      const productRef = doc<Product>(db, 'products', productId);
       await updateDoc(productRef, { status: newStatus });
       alert('상태가 성공적으로 변경되었습니다.');
     } catch (error) {

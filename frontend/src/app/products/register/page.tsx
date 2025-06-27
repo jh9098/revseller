@@ -40,7 +40,7 @@ export default function RegisterProductPage() {
       const uploadResult = await uploadBytes(storageRef, imageFile);
       const imageUrl = await getDownloadURL(uploadResult.ref);
 
-      await addDoc(collection(db, 'products'), {
+      await addDoc(collection<Product>(db, 'products'), {
         sellerId: user.uid,
         name: data.name,
         description: data.description,
