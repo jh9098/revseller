@@ -13,7 +13,10 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",                 // 추가
+    "paths": {                      // 추가
+      "@/*": ["src/*"]    
   },
   "include": ["next-env.d.ts", "src/**/*"],
   "exclude": ["node_modules"]
