@@ -41,7 +41,7 @@ export function PaymentButton({ price, orderId, orderName, productId }: Props) {
         orderId,
         orderName,
         successUrl: ${window.location.origin}/payment/success?productId=${productId},
-        failUrl: ${window.location.origin}/payment/fail,
+        failUrl: ${window.location.origin}/payment/fail',
         customerEmail: user?.email,
         customerName: user?.displayName || '판매자',
       });

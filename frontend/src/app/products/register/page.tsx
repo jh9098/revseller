@@ -35,7 +35,7 @@ export default function RegisterProductPage() {
 
     try {
       const imageFile = data.productImage[0];
-      const storageRef = ref(storage, products/${user.uid}/${Date.now()}_${imageFile.name});
+      const storageRef = ref(storage, `products/${user.uid}/${Date.now()}_${imageFile.name}`);
       const uploadResult = await uploadBytes(storageRef, imageFile);
       const imageUrl = await getDownloadURL(uploadResult.ref);
 

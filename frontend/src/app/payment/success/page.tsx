@@ -27,7 +27,7 @@ function PaymentSuccessContent() {
         setMessage('결제가 성공적으로 완료되었습니다! 3초 후 대시보드로 이동합니다.');
         setTimeout(() => router.push('/dashboard'), 3000);
       } catch (error: any) {
-        setMessage(결제 실패: ${error.message});
+        setMessage(`결제 실패: ${error.message}`);
       }
     };
     confirmPayment();
