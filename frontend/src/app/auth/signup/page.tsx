@@ -2,10 +2,17 @@
 export const dynamic = 'force-dynamic'; // 정적 생성 끄기
 import { useState } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { auth, db, functions } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+
+interface Seller {
+  email: string | null;
+  businessNumber: string;
+  isVerified: boolean;
+  createdAt: Timestamp;
+}
 
 export default function SignUpPage() {
   const [email, setEmail] = useState('');
@@ -31,7 +38,7 @@ export default function SignUpPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      await setDoc(doc(db, 'sellers', user.uid), {
+      await setDoc(doc<Seller>(db, 'sellers', user.uid), {
         email: user.email,
         businessNumber: businessNumber,
         isVerified: true,

@@ -17,8 +17,7 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
-// 브라우저 환경에서만 Firestore, Storage, Functions 초기화
-export const db = typeof window !== 'undefined' ? getFirestore(app) : null;
-export const storage = typeof window !== 'undefined' ? getStorage(app) : null;
-export const functions =
-  typeof window !== 'undefined' ? getFunctions(app, 'asia-northeast3') : null;
+// Firestore, Storage, Functions are safe to initialise in client components
+export const db = getFirestore(app);
+export const storage = getStorage(app);
+export const functions = getFunctions(app, 'asia-northeast3');
