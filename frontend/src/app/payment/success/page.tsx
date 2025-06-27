@@ -1,3 +1,4 @@
+'use client';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { httpsCallable } from 'firebase/functions';
