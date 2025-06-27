@@ -14,10 +14,12 @@ const firebaseConfig = {
 };
 
 // Firebase 앱 초기화
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+let app;
+if (typeof window !== 'undefined') {
+  app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+}
 
-export const auth = getAuth(app);
-// Firestore, Storage, Functions are safe to initialise in client components
-export const db = getFirestore(app);
-export const storage = getStorage(app);
-export const functions = getFunctions(app, 'asia-northeast3');
+export const auth = app ? getAuth(app) : ({} as any);
+export const db = app ? getFirestore(app) : ({} as any);
+export const storage = app ? getStorage(app) : ({} as any);
+export const functions = app ? getFunctions(app, 'asia-northeast3') : ({} as any);
