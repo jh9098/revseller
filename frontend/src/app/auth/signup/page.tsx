@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = 'force-dynamic'; // 정적 생성 끄기
 import { useState } from 'react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';

@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = 'force-dynamic'; // 정적 생성 끄기
 import { useState, useEffect } from 'react';
 import { collection, query, onSnapshot, doc, updateDoc, DocumentData, Timestamp } from 'firebase/firestore';
 import { db, auth } from '@/lib/firebase';

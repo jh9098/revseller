@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = 'force-dynamic'; // 정적 생성 끄기
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, useState, Suspense } from 'react';
 import { httpsCallable } from 'firebase/functions';
