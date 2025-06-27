@@ -40,9 +40,9 @@ export function PaymentButton({ price, orderId, orderName, productId }: Props) {
       await paymentWidget.requestPayment({
         orderId,
         orderName,
-        successUrl: ${window.location.origin}/payment/success?productId=${productId},
-        failUrl: ${window.location.origin}/payment/fail',
-        customerEmail: user?.email,
+        successUrl: `${window.location.origin}/payment/success?productId=${productId}`,
+        failUrl: `${window.location.origin}/payment/fail`,
+        customerEmail: user?.email ?? undefined,
         customerName: user?.displayName || '판매자',
       });
     } catch (error) {
