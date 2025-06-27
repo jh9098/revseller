@@ -1,7 +1,7 @@
 [build]
   base = "frontend"
   publish = "out"
-  command = "next build && next export"
+  command = "next build && next start"
 
 [[redirects]]
   from = "/*"
