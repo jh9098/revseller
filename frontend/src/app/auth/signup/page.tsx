@@ -38,7 +38,7 @@ export default function SignUpPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      await setDoc(doc<Seller>(db, 'sellers', user.uid), {
+      await setDoc(doc(db, 'sellers', user.uid), {
         email: user.email,
         businessNumber: businessNumber,
         isVerified: true,
