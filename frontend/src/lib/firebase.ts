@@ -20,10 +20,3 @@ export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 export const functions = getFunctions(app, "asia-northeast3");
-
-// 로컬 개발 시 에뮬레이터 연결 (선택사항)
-// if (process.env.NODE_ENV === 'development') {
-//   connectFunctionsEmulator(functions, "localhost", 5001);
-// }
-Use code with caution.
-TypeScript
