@@ -1,0 +1,16 @@
+# Node
+node_modules
+npm-debug.log*
+yarn-error.log*
+.pnpm-store
+# Env
+*.env
+.env.*
+# Next.js / Netlify build artifacts
+.next
+out
+# Firebase
+.firebase
+functions/lib
+# VS Code
+.vscode
