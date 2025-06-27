@@ -1,4 +1,5 @@
 'use client';
+export const dynamic = 'force-dynamic'; // 정적 생성 끄기
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, SubmitHandler } from 'react-hook-form';
