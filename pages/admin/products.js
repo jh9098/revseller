@@ -48,23 +48,23 @@ function CampaignManagement() {
       return;
     }
 
-    // 엑셀 시트에 맞게 데이터 재구성
-    const dataForExcel = campaigns.map(c => ({
-      '순번': campaigns.indexOf(c) + 1,
-      '진행일자': new Date(c.date.seconds * 1000).toLocaleDateString(),
-      '구분': c.deliveryType,
-      '리뷰종류': c.reviewType,
-      '작업개수': c.quantity,
-      '상품명': c.productName,
-      '옵션': c.productOption,
-      '상품가': c.productPrice,
-      '상품URL': c.productUrl,
-      '키워드': c.keywords,
-      '리뷰가이드': c.reviewGuide,
-      '비고': c.remarks,
-      '체험단견적': c.itemTotal,
-      '결제상태': c.status,
-      '판매자UID': c.sellerUid
+    // ✅ 방어 코드 추가: 각 필드의 값이 없을 경우 빈 문자열 ''을 사용
+    const dataForExcel = campaigns.map((c, index) => ({
+      '순번': index + 1,
+      '진행일자': c.date && c.date.seconds ? new Date(c.date.seconds * 1000).toLocaleDateString() : '',
+      '구분': c.deliveryType || '',
+      '리뷰종류': c.reviewType || '',
+      '작업개수': c.quantity || 0,
+      '상품명': c.productName || '',
+      '옵션': c.productOption || '',
+      '상품가': c.productPrice || 0,
+      '상품URL': c.productUrl || '',
+      '키워드': c.keywords || '',
+      '리뷰가이드': c.reviewGuide || '',
+      '비고': c.remarks || '',
+      '체험단견적': c.itemTotal || 0,
+      '결제상태': c.status || '',
+      '판매자UID': c.sellerUid || ''
     }));
 
     const csv = Papa.unparse(dataForExcel);
@@ -105,27 +105,35 @@ function CampaignManagement() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {campaigns.map((c) => (
-                <tr key={c.id}>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm">{new Date(c.date.seconds * 1000).toLocaleDateString()}</td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500" title={c.sellerUid}>{c.sellerUid.substring(0, 8)}...</td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm font-semibold">{c.productName}</td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm">{c.reviewType}</td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm">{c.quantity}</td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm">{c.itemTotal.toLocaleString()}원</td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${c.status === '예약 확정' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm">
-                    {/* 관리자가 직접 상태를 변경할 수 있는 버튼 */}
-                    {c.status !== '예약 확정' && <button onClick={() => handleUpdateStatus(c.id, '예약 확정')} className="text-indigo-600 hover:text-indigo-900 mr-4">확정</button>}
-                    {c.status !== '미확정' && <button onClick={() => handleUpdateStatus(c.id, '미확정')} className="text-gray-500 hover:text-gray-700">미확정</button>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+                {campaigns.map((c) => (
+                  <tr key={c.id}>
+                    {/* ✅ 방어 코드 추가: c.date와 c.date.seconds가 있을 때만 날짜로 변환 */}
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">
+                      {c.date && c.date.seconds ? new Date(c.date.seconds * 1000).toLocaleDateString() : '날짜 정보 없음'}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500" title={c.sellerUid}>
+                      {/* ✅ 방어 코드 추가: sellerUid가 없을 경우를 대비 */}
+                      {c.sellerUid ? c.sellerUid.substring(0, 8) + '...' : '판매자 정보 없음'}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm font-semibold">{c.productName || '상품명 없음'}</td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">{c.reviewType || '-'}</td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">{c.quantity || '-'}</td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">
+                      {/* ✅ 방어 코드 추가: itemTotal이 숫자일 때만 변환 */}
+                      {typeof c.itemTotal === 'number' ? c.itemTotal.toLocaleString() + '원' : '견적 정보 없음'}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${c.status === '예약 확정' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {c.status || '상태 없음'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">
+                      {c.status !== '예약 확정' && <button onClick={() => handleUpdateStatus(c.id, '예약 확정')} className="text-indigo-600 hover:text-indigo-900 mr-4">확정</button>}
+                      {c.status !== '미확정' && <button onClick={() => handleUpdateStatus(c.id, '미확정')} className="text-gray-500 hover:text-gray-700">미확정</button>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
           </table>
         )}
       </div>
