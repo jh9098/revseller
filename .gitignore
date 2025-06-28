@@ -1,0 +1,45 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# 의존성 모듈
+# node.js 프로젝트에서 가장 기본적으로 무시해야 할 폴더
+node_modules/
+
+# 빌드 결과물
+# Next.js가 개발/빌드 과정에서 자동으로 생성하는 폴더
+.next/
+out/
+
+# 배포/빌드 관련 로그 파일
+build/
+.pnp.js
+
+# 정적 파일 내보내기 캐시
+.next-static/
+
+# 테스트 관련 파일
+coverage/
+
+# 환경 변수 파일 (API 키 등 민감 정보 포함)
+# 절대 GitHub에 올리면 안 됩니다!
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+
+# npm/yarn 로그 및 오류 파일
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE 및 에디터 설정 파일
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# macOS 시스템 파일
+.DS_Store
