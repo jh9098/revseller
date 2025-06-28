@@ -211,7 +211,7 @@ export default function DashboardPage() {
           </div>
           <div className="md:col-span-2">
             <label className={labelClass}>키워드</label>
-            <input type="text" name="keywords" value={formState.keywords} onChange={handleFormChange} className={inputClass} placeholder="콤마(,)로 구분" />
+            <input type="text" name="keywords" value={formState.keywords} onChange={handleFormChange} className={inputClass} placeholder="1개만 입력" />
           </div>
           <div className="md:col-span-2">
             <label className={labelClass}>리뷰 가이드</label>
