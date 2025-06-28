@@ -23,8 +23,8 @@ export default function LoginPage() {
   const handleLogin = async () => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      alert('로그인 성공!');
-      router.push('/dashboard/products');
+      // alert('로그인 성공!'); // 알림창 제거
+      router.push('/dashboard/products'); // 즉시 대시보드로 이동
     } catch (error) {
       alert(`로그인 실패: ${error.message}`);
     }
