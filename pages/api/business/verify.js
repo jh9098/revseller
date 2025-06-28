@@ -22,8 +22,8 @@ export default async function handler(req, res) {
   }
 
   // 3. 최종 요청 URL 확인
-  const NTS_API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${serviceKey}`;
-  console.log('[API-LOG] Request URL:', NTS_API_URL);
+  const NTS_API_URL = `https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=${encodeURIComponent(serviceKey)}`;
+  console.log('[API-LOG] Encoded Request URL:', NTS_API_URL); // 로그도 수정해서 확인
 
   const requestBody = { b_no: [b_no] }; // API 명세상 배열이 맞습니다.
   console.log('[API-LOG] Request Body:', JSON.stringify(requestBody));
