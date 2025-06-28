@@ -5,12 +5,10 @@ import { collection, addDoc, serverTimestamp, query, where, onSnapshot, writeBat
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut } from 'firebase/auth';
 import { nanoid } from 'nanoid';
-
-// 달력 컴포넌트 및 CSS 임포트
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
-// --- 핵심 로직: 리뷰 단가 계산 엔진 (업데이트됨) ---
+// --- 핵심 로직: 리뷰 단가 계산 엔진 (최신 단가표 기준 업데이트) ---
 const getBasePrice = (deliveryType, reviewType) => {
   if (deliveryType === '실배송') {
     switch (reviewType) {
@@ -19,12 +17,16 @@ const getBasePrice = (deliveryType, reviewType) => {
       case '포토': return 1800;
       case '프리미엄(포토)': return 4000;
       case '프리미엄(영상)': return 5000;
-      default: return 0; // '단순구매'는 별점과 가격이 같으므로 별도 케이스 불필요
+      default: return 0;
     }
   } else if (deliveryType === '빈박스') {
+    // ✅ 빈박스는 '별점'과 '텍스트' 두 가지 경우를 모두 처리
     switch (reviewType) {
-      case '별점/텍스트': return 5400;
-      default: return 0;
+      case '별점':
+      case '텍스트':
+        return 5400;
+      default:
+        return 0;
     }
   }
   return 0;
@@ -49,24 +51,27 @@ export default function DashboardPage() {
   const [user, loading] = useAuthState(auth);
   const router = useRouter();
 
-  // 1. 입력 폼을 위한 상태
   const [formState, setFormState] = useState(initialFormState);
-  
-  // 2. 추가된 캠페인 목록 상태
   const [campaigns, setCampaigns] = useState([]);
-  
-  // 3. 최종 결제 금액 계산 상태
   const [totalAmount, setTotalAmount] = useState(0);
-  
-  // 4. DB에서 불러온 기존 캠페인 목록 상태
   const [savedCampaigns, setSavedCampaigns] = useState([]);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
 
   // --- 실시간 단가 계산 로직 ---
   const basePrice = getBasePrice(formState.deliveryType, formState.reviewType);
-  // getDay()는 일요일이 0, 월요일이 1, ...
   const sundayExtraCharge = formState.date.getDay() === 0 ? 600 : 0;
   const finalUnitPrice = basePrice + sundayExtraCharge;
+
+  // ✅ 중요: '구분'이 바뀔 때 '리뷰 종류'를 자동으로 리셋하는 useEffect 추가
+  useEffect(() => {
+    if (formState.deliveryType === '빈박스') {
+      // '빈박스'일 때 유효하지 않은 '리뷰 종류'가 선택되어 있다면, 기본값으로 변경
+      if (!['별점', '텍스트'].includes(formState.reviewType)) {
+        setFormState(prev => ({ ...prev, reviewType: '별점' }));
+      }
+    }
+  }, [formState.deliveryType, formState.reviewType]);
+
 
   // 폼 입력 변경 핸들러
   const handleFormChange = (e) => {
@@ -92,67 +97,55 @@ export default function DashboardPage() {
       itemTotal,
     };
     setCampaigns([...campaigns, newCampaign]);
-    setFormState(initialFormState); // 폼 초기화
+    setFormState(initialFormState);
   };
 
-  // 견적 항목 삭제 핸들러
   const handleDeleteCampaign = (id) => {
     setCampaigns(campaigns.filter(c => c.id !== id));
   };
   
-  // 견적 목록 변경 시 최종 결제 금액 실시간 계산
   useEffect(() => {
     const quoteTotal = campaigns.reduce((sum, campaign) => sum + campaign.itemTotal, 0);
-    const final = Math.round(quoteTotal * 1.14); // 부가세 10% + 수수료 4%
+    const final = Math.round(quoteTotal * 1.14);
     setTotalAmount(final);
   }, [campaigns]);
   
-  // 로그인 상태 및 DB 데이터 로드
   useEffect(() => {
     if (loading) return;
     if (!user) {
       router.push('/');
       return;
     }
-
     const q = query(collection(db, "campaigns"), where("sellerUid", "==", user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const dbData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setSavedCampaigns(dbData);
+      setSavedCampaigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setIsLoadingDB(false);
     });
-
     return () => unsubscribe();
   }, [user, loading, router]);
   
-  // 로그아웃 핸들러
   const handleLogout = async () => {
     await signOut(auth);
     router.push('/');
   };
 
-  // 최종 결제 및 DB 저장
   const handleProcessPayment = async () => {
     if (campaigns.length === 0) {
       alert('결제할 견적 항목이 없습니다.');
       return;
     }
     alert(`총 ${totalAmount.toLocaleString()}원 결제를 진행합니다.\n(PG사 연동 필요)`);
-    // TODO: 여기에 실제 토스페이먼츠 위젯 호출 로직을 연결해야 합니다.
   };
 
   if (loading || isLoadingDB) return <p>로딩 중...</p>;
 
-  // 스타일 재사용을 위한 변수 정의
   const thClass = "px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider";
   const tdClass = "px-4 py-3 whitespace-nowrap text-sm text-gray-800";
   const labelClass = "block text-sm font-medium text-gray-700 mb-1";
   const inputClass = "w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500";
 
-
   return (
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
-      {/* 헤더 */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">판매자 대시보드</h1>
         <div className="mt-4 sm:mt-0">
@@ -163,7 +156,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 입력 폼 */}
       <form onSubmit={handleAddCampaign} className="p-6 bg-white rounded-xl shadow-lg mb-8">
         <h2 className="text-2xl font-bold mb-6 text-gray-700">새 작업 추가</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 items-end">
@@ -190,11 +182,14 @@ export default function DashboardPage() {
                   <option>프리미엄(영상)</option>
                 </>
               ) : (
-                <option>별점/텍스트</option>
+                <>
+                  <option>별점</option>
+                  <option>텍스트</option>
+                </>
               )}
             </select>
           </div>
-           <div>
+          <div>
             <label className={labelClass}>작업 개수</label>
             <input type="number" name="quantity" value={formState.quantity} onChange={handleFormChange} className={inputClass} min="1" required/>
           </div>
@@ -222,12 +217,12 @@ export default function DashboardPage() {
             <label className={labelClass}>리뷰 가이드</label>
             <textarea name="reviewGuide" value={formState.reviewGuide} onChange={handleFormChange} className={inputClass} rows="2"></textarea>
           </div>
-           <div className="md:col-span-2">
+          <div className="md:col-span-2">
             <label className={labelClass}>비고</label>
             <input type="text" name="remarks" value={formState.remarks} onChange={handleFormChange} className={inputClass} />
           </div>
-           <div className="md:col-span-full xl:col-span-1 flex items-end">
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-transform transform hover:scale-105">
+          <div className="md:col-span-full xl:col-span-1 flex items-end">
+            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md">
               견적에 추가
             </button>
           </div>
@@ -269,7 +264,7 @@ export default function DashboardPage() {
                     <td className={tdClass}>{index + 1}</td>
                     <td className={tdClass}>
                       <span className={c.date.getDay() === 0 ? 'text-red-500 font-bold' : ''}>
-                        {c.date.toLocaleDateString()}
+                        {new Date(c.date).toLocaleDateString()}
                       </span>
                     </td>
                     <td className={tdClass}>{c.reviewType}</td>
