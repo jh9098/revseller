@@ -8,9 +8,8 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from "@fullcalendar/interaction";
 
-const formatDateToKST = (date) => {
-    // KST 보정 없이, JavaScript의 Date 객체를 YYYY-MM-DD 문자열로 변환
-    // FullCalendar의 timeZone='local' 설정과 맞추기 위함
+// ✅ formatDate 함수를 컴포넌트 바깥, 최상단에 정의합니다.
+const formatDate = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
@@ -30,12 +29,12 @@ const CapacityInput = ({ dateStr, initialValue }) => {
     }, [dateStr]);
 
     const handleChange = (e) => {
-        setValue(e.target.value); // 문자열 그대로 state에 저장
+        setValue(e.target.value);
     };
     
     const handleBlur = () => {
         const numericValue = Number(String(value).replace(/[^0-9]/g, ''));
-        setValue(numericValue); // 숫자만 남겨서 state 업데이트
+        setValue(numericValue);
         updateFirestore(numericValue);
     };
     
@@ -110,9 +109,7 @@ function AdminSchedule() {
         const dateStr = formatDate(dayCellInfo.date);
         const capacity = capacities[dateStr] || 0;
         
-        // ✅ 방어 코드 강화: dayCellInfo.events 배열을 직접 순회하여 계산
         const totalQuantity = dayCellInfo.events.reduce((sum, event) => {
-            // event.extendedProps가 존재하고, 그 안에 quantity가 있을 경우에만 더함
             const quantity = event.extendedProps?.quantity || 0;
             return sum + Number(quantity);
         }, 0);
