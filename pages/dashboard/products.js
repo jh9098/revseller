@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { db, auth } from '../../lib/firebase';
-import { collection, addDoc, serverTimestamp, query, where, onSnapshot, writeBatch, doc } from 'firebase/firestore';
+import { collection, addDoc, deleteDoc, serverTimestamp, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut } from 'firebase/auth';
 import { nanoid } from 'nanoid';
@@ -80,7 +80,7 @@ export default function DashboardPage() {
   };
 
   // 견적 항목 추가 핸들러
-  const handleAddCampaign = (e) => {
+  const handleAddCampaign = async (e) => {
     e.preventDefault();
     if (basePrice === 0) {
       alert('해당 조합의 가격 정책이 없습니다. 선택을 확인해주세요.');
@@ -89,19 +89,42 @@ export default function DashboardPage() {
     const itemTotal = (finalUnitPrice + Number(formState.productPrice)) * Number(formState.quantity);
 
     const newCampaign = {
-      id: nanoid(),
       ...formState,
-      basePrice, 
+      basePrice,
       sundayExtraCharge,
       finalUnitPrice,
       itemTotal,
     };
+
+    try {
+      if (user) {
+        const docRef = await addDoc(collection(db, 'campaigns'), {
+          ...newCampaign,
+          sellerUid: user.uid,
+          createdAt: serverTimestamp(),
+          status: '미확정'
+        });
+        newCampaign.id = docRef.id;
+      } else {
+        newCampaign.id = nanoid();
+      }
+    } catch (err) {
+      console.error('Error saving campaign:', err);
+      alert('데이터 저장 중 오류가 발생했습니다.');
+      newCampaign.id = nanoid();
+    }
+
     setCampaigns([...campaigns, newCampaign]);
     setFormState(initialFormState);
   };
 
-  const handleDeleteCampaign = (id) => {
+  const handleDeleteCampaign = async (id) => {
     setCampaigns(campaigns.filter(c => c.id !== id));
+    try {
+      await deleteDoc(doc(db, 'campaigns', id));
+    } catch (err) {
+      console.error('Error deleting campaign:', err);
+    }
   };
   
   useEffect(() => {
@@ -110,26 +133,6 @@ export default function DashboardPage() {
     setTotalAmount(final);
   }, [campaigns]);
 
-  const saveCampaignsToDB = async () => {
-    if (!user) return;
-    try {
-      const batch = writeBatch(db);
-      campaigns.forEach((c) => {
-        const ref = doc(collection(db, 'campaigns'));
-        batch.set(ref, {
-          ...c,
-          sellerUid: user.uid,
-          createdAt: serverTimestamp(),
-          status: '미확정'
-        });
-      });
-      await batch.commit();
-      setCampaigns([]);
-    } catch (err) {
-      console.error('Error saving campaigns:', err);
-      alert('데이터 저장 중 오류가 발생했습니다.');
-    }
-  };
   
   useEffect(() => {
     if (loading) return;
@@ -155,7 +158,6 @@ export default function DashboardPage() {
       alert('결제할 견적 항목이 없습니다.');
       return;
     }
-    await saveCampaignsToDB();
     alert(`총 ${totalAmount.toLocaleString()}원 결제를 진행합니다.\n(PG사 연동 필요)`);
   };
 
