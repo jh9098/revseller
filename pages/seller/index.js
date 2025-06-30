@@ -3,6 +3,11 @@ import SellerLayout from '../../components/seller/SellerLayout';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, getDoc, doc } from 'firebase/firestore';
 
+const formatDate = (d) => {
+  const offset = d.getTimezoneOffset();
+  return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 10);
+};
+
 export default function SellerHome() {
   const [schedule, setSchedule] = useState({});
   const [totals, setTotals] = useState({});
@@ -53,7 +58,7 @@ export default function SellerHome() {
     const loadCaps = async () => {
       const caps = {};
       for (const d of dates) {
-        const dateStr = d.toISOString().slice(0, 10);
+        const dateStr = formatDate(d);
         const snap = await getDoc(doc(db, 'capacities', dateStr));
         caps[dateStr] = snap.exists() ? snap.data().capacity : 0;
       }
@@ -72,7 +77,7 @@ export default function SellerHome() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
         {weekDates.map((d) => {
           const idx = d.getDay();
-          const dateStr = d.toISOString().slice(0,10);
+          const dateStr = formatDate(d);
           return (
           <div key={dateStr} className="bg-white p-4 rounded-lg shadow">
             <h3 className="font-semibold mb-2">{dayNames[idx]} {dateStr}</h3>
@@ -107,7 +112,7 @@ export default function SellerHome() {
         <tbody className="divide-y">
           {weekDates.map((d) => {
             const idx = d.getDay();
-            const dateStr = d.toISOString().slice(0,10);
+            const dateStr = formatDate(d);
             return (
               <tr key={dateStr} className="text-center text-sm">
                 <td className="px-4 py-2">{dayNames[idx]} {dateStr}</td>
