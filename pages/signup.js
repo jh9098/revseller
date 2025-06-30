@@ -11,13 +11,14 @@ export default function SignupPage() {
   const [phone, setPhone] = useState('');
   const [bNo, setBNo] = useState('');
   const [referrerId, setReferrerId] = useState('');
+  const [nickname, setNickname] = useState('');
   const [username, setUsername] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const router = useRouter();
 
   const handleSignUpAndVerify = async (e) => {
     e.preventDefault();
-    if (!email || !password || !bNo || !name || !phone || !username) {
+    if (!email || !password || !bNo || !name || !phone || !username || !nickname) {
       alert('모든 필드를 입력해주세요.');
       return;
     }
@@ -30,6 +31,18 @@ export default function SignupPage() {
       const bNoQuery = query(collection(db, 'sellers'), where('businessInfo.b_no', '==', bNo));
       const bNoSnap = await getDocs(bNoQuery);
       if (!bNoSnap.empty) throw new Error('이미 등록된 사업자 번호입니다.');
+
+      const phoneQuery = query(collection(db, 'sellers'), where('phone', '==', phone));
+      const phoneSnap = await getDocs(phoneQuery);
+      if (!phoneSnap.empty) throw new Error('이미 사용 중인 전화번호입니다.');
+
+      const usernameQuery = query(collection(db, 'sellers'), where('username', '==', username));
+      const usernameSnap = await getDocs(usernameQuery);
+      if (!usernameSnap.empty) throw new Error('이미 사용 중인 ID입니다.');
+
+      const nicknameQuery = query(collection(db, 'sellers'), where('nickname', '==', nickname));
+      const nicknameSnap = await getDocs(nicknameQuery);
+      if (!nicknameSnap.empty) throw new Error('이미 사용 중인 닉네임입니다.');
 
       const response = await fetch('/api/business/verify', {
         method: 'POST',
@@ -47,6 +60,7 @@ export default function SignupPage() {
           name,
           phone,
           username,
+          nickname,
           referrerId,
           businessInfo: data,
           isVerified: true,
@@ -77,6 +91,7 @@ export default function SignupPage() {
         <input value={bNo} onChange={e => setBNo(e.target.value.replace(/-/g,''))} placeholder="사업자등록번호('-' 제외)" style={{ width:'100%', padding:'8px', marginBottom:'10px' }} />
         <input value={referrerId} onChange={e => setReferrerId(e.target.value)} placeholder="추천인 ID" style={{ width:'100%', padding:'8px', marginBottom:'10px' }} />
         <input value={username} onChange={e => setUsername(e.target.value)} placeholder="ID" style={{ width:'100%', padding:'8px', marginBottom:'10px' }} />
+        <input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="닉네임" style={{ width:'100%', padding:'8px', marginBottom:'10px' }} />
         <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="PW" style={{ width:'100%', padding:'8px', marginBottom:'10px' }} />
         <button type="submit" disabled={isVerifying} style={{ width:'100%', padding:'10px' }}>
           {isVerifying ? '인증 중...' : '가입하기'}

@@ -22,6 +22,11 @@ export default function AdminLayout({ children }) {
                 판매자 관리
               </Link>
             </li>
+            <li className="mb-4">
+              <Link href="/admin/schedule" className="hover:bg-gray-700 p-2 rounded block">
+                예약 시트 관리
+              </Link>
+            </li>
           </ul>
         </nav>
       </aside>
