@@ -4,6 +4,7 @@ import { db, auth } from '../../lib/firebase';
 import { collection, addDoc, deleteDoc, serverTimestamp, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut } from 'firebase/auth';
+import SellerLayout from '../../components/seller/SellerLayout';
 import { nanoid } from 'nanoid';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -169,6 +170,7 @@ export default function DashboardPage() {
   const inputClass = "w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500";
 
   return (
+    <SellerLayout>
     <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">판매자 대시보드</h1>
@@ -320,5 +322,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </SellerLayout>
   );
 }
