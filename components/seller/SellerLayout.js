@@ -8,6 +8,11 @@ export default function SellerLayout({ children }) {
         <nav>
           <ul>
             <li className="mb-4">
+              <Link href="/seller" className="hover:bg-gray-700 p-2 rounded block">
+                예약 시트
+              </Link>
+            </li>
+            <li className="mb-4">
               <Link href="/dashboard/products" className="hover:bg-gray-700 p-2 rounded block">
                 예약하기
               </Link>

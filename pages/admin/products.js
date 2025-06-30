@@ -123,13 +123,33 @@ function CampaignManagement() {
                       {typeof c.itemTotal === 'number' ? c.itemTotal.toLocaleString() + '원' : '견적 정보 없음'}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${c.status === '예약 확정' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                      <span
+                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          c.status === '리뷰완료'
+                            ? 'bg-blue-100 text-blue-800'
+                            : c.status === '구매완료'
+                            ? 'bg-green-200 text-green-800'
+                            : c.status === '예약 확정'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}
+                      >
                         {c.status || '상태 없음'}
                       </span>
                     </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm">
-                      {c.status !== '예약 확정' && <button onClick={() => handleUpdateStatus(c.id, '예약 확정')} className="text-indigo-600 hover:text-indigo-900 mr-4">확정</button>}
-                      {c.status !== '미확정' && <button onClick={() => handleUpdateStatus(c.id, '미확정')} className="text-gray-500 hover:text-gray-700">미확정</button>}
+                    <td className="px-3 py-4 whitespace-nowrap text-sm space-x-2">
+                      {c.status !== '예약 확정' && (
+                        <button onClick={() => handleUpdateStatus(c.id, '예약 확정')} className="text-indigo-600 hover:text-indigo-900">확정</button>
+                      )}
+                      {c.status !== '미확정' && (
+                        <button onClick={() => handleUpdateStatus(c.id, '미확정')} className="text-gray-500 hover:text-gray-700">미확정</button>
+                      )}
+                      {c.status !== '구매완료' && (
+                        <button onClick={() => handleUpdateStatus(c.id, '구매완료')} className="text-green-600 hover:text-green-800">구매완료</button>
+                      )}
+                      {c.status !== '리뷰완료' && (
+                        <button onClick={() => handleUpdateStatus(c.id, '리뷰완료')} className="text-blue-600 hover:text-blue-800">리뷰완료</button>
+                      )}
                     </td>
                   </tr>
                 ))}
