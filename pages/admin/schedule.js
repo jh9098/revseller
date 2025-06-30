@@ -4,6 +4,11 @@ import withAdminAuth from '../../hoc/withAdminAuth';
 import { db } from '../../lib/firebase';
 import { collection, query, where, onSnapshot, Timestamp, doc, getDoc, setDoc } from 'firebase/firestore';
 
+const formatDate = (d) => {
+  const offset = d.getTimezoneOffset();
+  return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 10);
+};
+
 function AdminSchedule() {
   const [schedule, setSchedule] = useState({});
   const [totals, setTotals] = useState({});
@@ -53,7 +58,7 @@ function AdminSchedule() {
     const loadCaps = async () => {
       const caps = {};
       for(const d of days){
-        const dateStr = d.toISOString().slice(0,10);
+        const dateStr = formatDate(d);
         const snap = await getDoc(doc(db,'capacities',dateStr));
         caps[dateStr] = snap.exists()? snap.data().capacity : 0;
       }
@@ -65,8 +70,9 @@ function AdminSchedule() {
   }, []);
 
   const handleCapChange = async (dateStr, value) => {
-    await setDoc(doc(db,'capacities',dateStr), { capacity: Number(value) });
-    setCapacities(prev => ({ ...prev, [dateStr]: Number(value) }));
+    const onlyNums = value.replace(/\D/g, '');
+    await setDoc(doc(db,'capacities',dateStr), { capacity: Number(onlyNums) });
+    setCapacities(prev => ({ ...prev, [dateStr]: Number(onlyNums) }));
   };
 
   const dayNames = ['일','월','화','수','목','금','토'];
@@ -77,7 +83,7 @@ function AdminSchedule() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
         {weekDates.map(d => {
           const idx = d.getDay();
-          const dateStr = d.toISOString().slice(0,10);
+          const dateStr = formatDate(d);
           return (
             <div key={dateStr} className="bg-white p-4 rounded shadow">
               <h3 className="font-semibold mb-2">{dayNames[idx]} {dateStr}</h3>
@@ -97,7 +103,9 @@ function AdminSchedule() {
                 합계: {totals[idx] || 0}개
               </div>
               <input
-                type="number"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={capacities[dateStr] || ''}
                 onChange={e => handleCapChange(dateStr, e.target.value)}
                 className="mt-2 w-full p-1 border rounded"
@@ -118,7 +126,7 @@ function AdminSchedule() {
         <tbody className="divide-y">
           {weekDates.map(d => {
             const idx = d.getDay();
-            const dateStr = d.toISOString().slice(0,10);
+            const dateStr = formatDate(d);
             return (
               <tr key={dateStr} className="text-center text-sm">
                 <td className="px-4 py-2">{dayNames[idx]} {dateStr}</td>
