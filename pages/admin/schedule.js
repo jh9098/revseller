@@ -8,7 +8,6 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from "@fullcalendar/interaction";
 
-// ✅ formatDate 함수를 컴포넌트 바깥, 최상단에 정의합니다.
 const formatDate = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -16,10 +15,8 @@ const formatDate = (date) => {
     return `${year}-${month}-${day}`;
 };
 
-// 입력 필드 컴포넌트
 const CapacityInput = ({ dateStr, initialValue }) => {
     const [value, setValue] = useState(initialValue);
-
     const updateFirestore = useCallback(async (numericValue) => {
         try {
             await setDoc(doc(db, 'capacities', dateStr), { capacity: numericValue });
@@ -27,28 +24,17 @@ const CapacityInput = ({ dateStr, initialValue }) => {
             console.error("Capacity 업데이트 오류:", error);
         }
     }, [dateStr]);
-
-    const handleChange = (e) => {
-        setValue(e.target.value);
-    };
-    
+    const handleChange = (e) => { setValue(e.target.value); };
     const handleBlur = () => {
         const numericValue = Number(String(value).replace(/[^0-9]/g, ''));
         setValue(numericValue);
         updateFirestore(numericValue);
     };
-    
-    useEffect(() => {
-        setValue(initialValue);
-    }, [initialValue]);
-
+    useEffect(() => { setValue(initialValue); }, [initialValue]);
     return (
         <input
-            type="number"
-            value={value}
-            onChange={handleChange}
-            onBlur={handleBlur}
-            onClick={(e) => e.stopPropagation()}
+            type="number" value={value} onChange={handleChange}
+            onBlur={handleBlur} onClick={(e) => e.stopPropagation()}
             className="w-full text-center border rounded-sm p-0.5"
             placeholder="총량"
         />
@@ -75,19 +61,12 @@ function AdminSchedule() {
             });
             setEvents(fetchedEvents);
         });
-
         const capacityUnsubscribe = onSnapshot(collection(db, 'capacities'), (snap) => {
             const fetchedCaps = {};
-            snap.forEach(doc => {
-                fetchedCaps[doc.id] = doc.data().capacity || 0;
-            });
+            snap.forEach(doc => { fetchedCaps[doc.id] = doc.data().capacity || 0; });
             setCapacities(fetchedCaps);
         });
-
-        return () => {
-            campaignUnsubscribe();
-            capacityUnsubscribe();
-        };
+        return () => { campaignUnsubscribe(); capacityUnsubscribe(); };
     }, []);
 
     const handleDatesSet = (dateInfo) => {
@@ -104,12 +83,17 @@ function AdminSchedule() {
         }
         return dates;
     }, [currentMonth]);
-
+    
+    // ✅ 최종 수정된 renderDayCell 함수
     const renderDayCell = (dayCellInfo) => {
         const dateStr = formatDate(dayCellInfo.date);
         const capacity = capacities[dateStr] || 0;
         
-        const totalQuantity = dayCellInfo.events.reduce((sum, event) => {
+        // 1. dayCellInfo.events가 배열인지 먼저 확인합니다. 아니라면 빈 배열로 처리합니다.
+        const dailyEvents = Array.isArray(dayCellInfo.events) ? dayCellInfo.events : [];
+
+        // 2. 이제 안전하게 .reduce()를 사용할 수 있습니다.
+        const totalQuantity = dailyEvents.reduce((sum, event) => {
             const quantity = event.extendedProps?.quantity || 0;
             return sum + Number(quantity);
         }, 0);
@@ -129,15 +113,12 @@ function AdminSchedule() {
     return (
         <AdminLayout>
             <h2 className="text-2xl font-bold mb-4">예약 시트 관리 (월간)</h2>
-            
             <div className="bg-white p-4 rounded-lg shadow-md mb-8">
                 <FullCalendar
                     plugins={[dayGridPlugin, interactionPlugin]}
                     initialView="dayGridMonth"
                     headerToolbar={{
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: 'dayGridMonth,dayGridWeek'
+                        left: 'prev,next today', center: 'title', right: 'dayGridMonth,dayGridWeek'
                     }}
                     events={events}
                     dayCellContent={renderDayCell}
@@ -147,7 +128,6 @@ function AdminSchedule() {
                     timeZone='local'
                 />
             </div>
-
             <div className="bg-white p-6 rounded-lg shadow-md">
                 <h3 className="text-xl font-bold mb-4">{currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월 작업 가능 개수 설정</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
