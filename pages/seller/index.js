@@ -1,129 +1,102 @@
 import { useEffect, useState } from 'react';
 import SellerLayout from '../../components/seller/SellerLayout';
 import { db } from '../../lib/firebase';
-import { collection, query, where, onSnapshot, Timestamp, getDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, getDoc } from 'firebase/firestore';
 
-const formatDate = (d) => {
-  const offset = d.getTimezoneOffset();
-  return new Date(d.getTime() - offset * 60000).toISOString().slice(0, 10);
-};
+// FullCalendar 컴포넌트 임포트
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from "@fullcalendar/interaction";
 
-export default function SellerHome() {
-  const [schedule, setSchedule] = useState({});
-  const [totals, setTotals] = useState({});
+const formatDate = (date) => date.toISOString().slice(0, 10);
+
+function SellerHome() {
+  const [events, setEvents] = useState([]);
   const [capacities, setCapacities] = useState({});
-  const [weekDates, setWeekDates] = useState([]);
 
   useEffect(() => {
-    const today = new Date();
-    const day = today.getDay();
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(today.setDate(diff));
-    monday.setHours(0, 0, 0, 0);
-
-    const dates = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      dates.push(d);
-    }
-    setWeekDates(dates);
-
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    sunday.setHours(23, 59, 59, 999);
-
-    const q = query(
-      collection(db, 'campaigns'),
-      where('date', '>=', Timestamp.fromDate(monday)),
-      where('date', '<=', Timestamp.fromDate(sunday))
-    );
-
-    const unsubscribe = onSnapshot(q, async (snap) => {
-      const temp = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [], 0: [] };
-      const sums = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 0: 0 };
-      for (const d of snap.docs) {
+    // 1. 캠페인 데이터 실시간 로드
+    const campaignUnsubscribe = onSnapshot(collection(db, 'campaigns'), async (snap) => {
+      const fetchedEvents = await Promise.all(snap.docs.map(async (d) => {
         const data = d.data();
-        const campaignDate = data.date?.seconds ? new Date(data.date.seconds * 1000) : new Date(data.date);
-        const sellerRef = doc(db, 'sellers', data.sellerUid);
-        const sellerSnap = await getDoc(sellerRef);
+        const eventDate = data.date?.seconds ? new Date(data.date.seconds * 1000) : new Date(data.date);
+        
+        // 판매자 닉네임 가져오기
+        const sellerSnap = await getDoc(doc(db, 'sellers', data.sellerUid));
         const nickname = sellerSnap.exists() ? (sellerSnap.data().nickname || sellerSnap.data().name) : '알수없음';
-        temp[campaignDate.getDay()].push({ id: d.id, nickname, quantity: data.quantity });
-        sums[campaignDate.getDay()] += Number(data.quantity || 0);
-      }
-      setSchedule(temp);
-      setTotals(sums);
+
+        return {
+          id: d.id,
+          title: `${nickname} (${data.quantity}개)`, // 이벤트 제목에 닉네임과 수량 표시
+          start: eventDate,
+          allDay: true,
+          extendedProps: { // 추가 정보 저장
+            quantity: data.quantity
+          }
+        };
+      }));
+      setEvents(fetchedEvents);
     });
 
-    const loadCaps = async () => {
-      const caps = {};
-      for (const d of dates) {
-        const dateStr = formatDate(d);
-        const snap = await getDoc(doc(db, 'capacities', dateStr));
-        caps[dateStr] = snap.exists() ? snap.data().capacity : 0;
-      }
-      setCapacities(caps);
+    // 2. 작업 가능 개수 데이터 실시간 로드
+    const capacityUnsubscribe = onSnapshot(collection(db, 'capacities'), (snap) => {
+      const fetchedCaps = {};
+      snap.forEach(doc => {
+        fetchedCaps[doc.id] = doc.data().capacity || 0;
+      });
+      setCapacities(fetchedCaps);
+    });
+
+    return () => {
+      campaignUnsubscribe();
+      capacityUnsubscribe();
     };
-    loadCaps();
-
-    return () => unsubscribe();
   }, []);
+  
+  // 판매자용 달력 셀 렌더링 함수
+  const renderSellerDayCell = (dayCellInfo) => {
+    const dateStr = formatDate(dayCellInfo.date);
+    const capacity = capacities[dateStr] || 0;
+    
+    const totalQuantity = events
+      .filter(e => formatDate(new Date(e.start)) === dateStr)
+      .reduce((sum, e) => sum + Number(e.extendedProps.quantity || 0), 0);
+      
+    const remaining = capacity - totalQuantity;
+    const remainingColor = remaining > 0 ? 'text-blue-600' : 'text-red-600';
 
-  const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+    return (
+      <div className="p-1">
+        <div className="text-right text-sm">{dayCellInfo.dayNumberText}</div>
+        <div className="mt-4 text-center">
+            <span className="text-xs text-gray-500">잔여: </span>
+            <span className={`font-bold ${remainingColor}`}>{remaining}</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <SellerLayout>
-      <h2 className="text-2xl font-bold mb-4">예약 시트</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-4">
-        {weekDates.map((d) => {
-          const idx = d.getDay();
-          const dateStr = formatDate(d);
-          return (
-          <div key={dateStr} className="bg-white p-4 rounded-lg shadow">
-            <h3 className="font-semibold mb-2">{dayNames[idx]} {dateStr}</h3>
-            {schedule[idx] && schedule[idx].length > 0 ? (
-              <ul className="text-sm space-y-1">
-                {schedule[idx].map((c) => (
-                  <li key={c.id} className="flex justify-between">
-                    <span>{c.nickname}</span>
-                    <span>{c.quantity}개</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-gray-400 text-sm">예약 없음</p>
-            )}
-            <div className="mt-2 text-right text-sm font-semibold">
-              합계: {totals[idx] || 0}개 / 총 {capacities[dateStr] || 0} / 잔여 {(capacities[dateStr] || 0) - (totals[idx] || 0)}개
-            </div>
-          </div>
-          );
-        })}
+      <h2 className="text-2xl font-bold mb-4">예약 현황 (월간)</h2>
+      <div className="bg-white p-4 rounded-lg shadow-md">
+        <FullCalendar
+          plugins={[dayGridPlugin, interactionPlugin]}
+          initialView="dayGridMonth"
+          headerToolbar={{
+            left: 'prev,next today',
+            center: 'title',
+            right: ''
+          }}
+          events={events}
+          dayCellContent={renderSellerDayCell}
+          locale="ko"
+          height="auto"
+          eventDisplay="block" // 이벤트를 블록 형태로 표시
+        />
       </div>
-      <table className="mt-6 min-w-full bg-white rounded shadow">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="px-4 py-2">날짜</th>
-            <th className="px-4 py-2">총작업가능</th>
-            <th className="px-4 py-2">진행예약</th>
-            <th className="px-4 py-2">잔여예약</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {weekDates.map((d) => {
-            const idx = d.getDay();
-            const dateStr = formatDate(d);
-            return (
-              <tr key={dateStr} className="text-center text-sm">
-                <td className="px-4 py-2">{dayNames[idx]} {dateStr}</td>
-                <td className="px-4 py-2">{capacities[dateStr] || 0}</td>
-                <td className="px-4 py-2">{totals[idx] || 0}</td>
-                <td className="px-4 py-2">{(capacities[dateStr] || 0) - (totals[idx] || 0)}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
     </SellerLayout>
   );
 }
+
+export default SellerHome;
