@@ -109,6 +109,27 @@ export default function DashboardPage() {
     const final = Math.round(quoteTotal * 1.14);
     setTotalAmount(final);
   }, [campaigns]);
+
+  const saveCampaignsToDB = async () => {
+    if (!user) return;
+    try {
+      const batch = writeBatch(db);
+      campaigns.forEach((c) => {
+        const ref = doc(collection(db, 'campaigns'));
+        batch.set(ref, {
+          ...c,
+          sellerUid: user.uid,
+          createdAt: serverTimestamp(),
+          status: '미확정'
+        });
+      });
+      await batch.commit();
+      setCampaigns([]);
+    } catch (err) {
+      console.error('Error saving campaigns:', err);
+      alert('데이터 저장 중 오류가 발생했습니다.');
+    }
+  };
   
   useEffect(() => {
     if (loading) return;
@@ -134,6 +155,7 @@ export default function DashboardPage() {
       alert('결제할 견적 항목이 없습니다.');
       return;
     }
+    await saveCampaignsToDB();
     alert(`총 ${totalAmount.toLocaleString()}원 결제를 진행합니다.\n(PG사 연동 필요)`);
   };
 
