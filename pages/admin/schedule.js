@@ -8,6 +8,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from "@fullcalendar/interaction";
 
+// ✅ 최상단에 날짜 포맷 함수 정의
 const formatDate = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -32,12 +33,8 @@ const CapacityInput = ({ dateStr, initialValue }) => {
     };
     useEffect(() => { setValue(initialValue); }, [initialValue]);
     return (
-        <input
-            type="number" value={value} onChange={handleChange}
-            onBlur={handleBlur} onClick={(e) => e.stopPropagation()}
-            className="w-full text-center border rounded-sm p-0.5"
-            placeholder="총량"
-        />
+        <input type="number" value={value} onChange={handleChange} onBlur={handleBlur} onClick={(e) => e.stopPropagation()}
+            className="w-full text-center border rounded-sm p-0.5" placeholder="총량" />
     );
 };
 
@@ -70,7 +67,8 @@ function AdminSchedule() {
     }, []);
 
     const handleDatesSet = (dateInfo) => {
-        setCurrentMonth(dateInfo.start);
+        // ✅ FullCalendar의 view 객체에서 시작 날짜를 가져와 월을 설정
+        setCurrentMonth(dateInfo.view.currentStart);
     };
 
     const currentMonthDates = useMemo(() => {
@@ -79,28 +77,19 @@ function AdminSchedule() {
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const dates = [];
         for (let i = 1; i <= daysInMonth; i++) {
+            // 로컬 시간대 기준으로 날짜 객체 생성
             dates.push(formatDate(new Date(year, month, i)));
         }
         return dates;
     }, [currentMonth]);
-    
-    // ✅ 최종 수정된 renderDayCell 함수
+
     const renderDayCell = (dayCellInfo) => {
         const dateStr = formatDate(dayCellInfo.date);
         const capacity = capacities[dateStr] || 0;
-        
-        // 1. dayCellInfo.events가 배열인지 먼저 확인합니다. 아니라면 빈 배열로 처리합니다.
         const dailyEvents = Array.isArray(dayCellInfo.events) ? dayCellInfo.events : [];
-
-        // 2. 이제 안전하게 .reduce()를 사용할 수 있습니다.
-        const totalQuantity = dailyEvents.reduce((sum, event) => {
-            const quantity = event.extendedProps?.quantity || 0;
-            return sum + Number(quantity);
-        }, 0);
-        
+        const totalQuantity = dailyEvents.reduce((sum, event) => sum + Number(event.extendedProps?.quantity || 0), 0);
         const remaining = capacity - totalQuantity;
         const remainingColor = remaining > 0 ? 'text-blue-600' : 'text-red-600';
-
         return (
             <div className="p-1 text-center">
                 <div className="text-sm">{dayCellInfo.dayNumberText}</div>
