@@ -55,7 +55,6 @@ export default function DashboardPage() {
   const [formState, setFormState] = useState(initialFormState);
   const [campaigns, setCampaigns] = useState([]);
   const [totalAmount, setTotalAmount] = useState(0);
-  const [savedCampaigns, setSavedCampaigns] = useState([]);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
 
   // --- 실시간 단가 계산 로직 ---
@@ -115,12 +114,10 @@ export default function DashboardPage() {
       newCampaign.id = nanoid();
     }
 
-    setCampaigns([...campaigns, newCampaign]);
     setFormState(initialFormState);
   };
 
   const handleDeleteCampaign = async (id) => {
-    setCampaigns(campaigns.filter(c => c.id !== id));
     try {
       await deleteDoc(doc(db, 'campaigns', id));
     } catch (err) {
@@ -143,7 +140,7 @@ export default function DashboardPage() {
     }
     const q = query(collection(db, "campaigns"), where("sellerUid", "==", user.uid));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      setSavedCampaigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setCampaigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setIsLoadingDB(false);
     });
     return () => unsubscribe();
@@ -285,12 +282,14 @@ export default function DashboardPage() {
               {campaigns.length === 0 ? (
                 <tr><td colSpan="9" className="text-center py-10 text-gray-500">위에서 작업을 추가해주세요.</td></tr>
               ) : (
-                campaigns.map((c, index) => (
+                campaigns.map((c, index) => {
+                  const d = c.date?.seconds ? new Date(c.date.seconds * 1000) : new Date(c.date);
+                  return (
                   <tr key={c.id}>
                     <td className={tdClass}>{index + 1}</td>
                     <td className={tdClass}>
-                      <span className={c.date.getDay() === 0 ? 'text-red-500 font-bold' : ''}>
-                        {new Date(c.date).toLocaleDateString()}
+                      <span className={d.getDay() === 0 ? 'text-red-500 font-bold' : ''}>
+                        {d.toLocaleDateString()}
                       </span>
                     </td>
                     <td className={tdClass}>{c.reviewType}</td>
@@ -305,7 +304,8 @@ export default function DashboardPage() {
                       <button onClick={() => handleDeleteCampaign(c.id)} className="text-red-600 hover:text-red-800 font-semibold">삭제</button>
                     </td>
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>
