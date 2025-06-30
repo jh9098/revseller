@@ -71,8 +71,9 @@ function AdminSchedule() {
 
   const handleCapChange = async (dateStr, value) => {
     const onlyNums = value.replace(/\D/g, '');
-    await setDoc(doc(db,'capacities',dateStr), { capacity: Number(onlyNums) });
-    setCapacities(prev => ({ ...prev, [dateStr]: Number(onlyNums) }));
+    const numVal = Number(onlyNums);
+    await setDoc(doc(db, 'capacities', dateStr), { capacity: numVal });
+    setCapacities((prev) => ({ ...prev, [dateStr]: numVal }));
   };
 
   const dayNames = ['일','월','화','수','목','금','토'];
@@ -103,11 +104,13 @@ function AdminSchedule() {
                 합계: {totals[idx] || 0}개
               </div>
               <input
-                type="text"
+                type="number"
                 inputMode="numeric"
                 pattern="[0-9]*"
+                min="0"
+                step="1"
                 value={capacities[dateStr] || ''}
-                onChange={e => handleCapChange(dateStr, e.target.value)}
+                onChange={(e) => handleCapChange(dateStr, e.target.value)}
                 className="mt-2 w-full p-1 border rounded"
               />
             </div>
