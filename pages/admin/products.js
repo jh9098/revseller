@@ -7,7 +7,7 @@ import withAdminAuth from '../../hoc/withAdminAuth';
 import Papa from 'papaparse';
 
 function CampaignManagement() {
-  const [campaigns, setCampaigns] = = useState([]);
+  const [campaigns, setCampaigns] =  useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
