@@ -17,16 +17,14 @@ const formatDate = (date) => {
 
 function SellerHome() {
     const [campaigns, setCampaigns] = useState([]);
-    const [sellers, setSellers] = useState({}); // { "사용자UID": "닉네임" } 형태의 맵
+    const [sellers, setSellers] = useState({});
     const [capacities, setCapacities] = useState({});
 
     useEffect(() => {
-        // Sellers 컬렉션에서 'uid'를 key로, 'nickname'을 value로 하는 맵을 생성
         const sellerUnsubscribe = onSnapshot(collection(db, 'sellers'), (snap) => {
             const fetchedSellers = {};
             snap.forEach(doc => {
                 const data = doc.data();
-                // ✅ sellers 문서의 uid 필드를 key로 사용
                 if (data.uid) {
                     fetchedSellers[data.uid] = data.nickname || '이름없음';
                 }
@@ -61,7 +59,6 @@ function SellerHome() {
         if (Object.keys(sellers).length === 0) return [];
 
         return campaigns.map(campaign => {
-            // ✅ campaigns 문서의 sellerUid 필드를 사용하여 닉네임 조회
             const sellerUid = campaign.sellerUid;
             const nickname = sellers[sellerUid] || '판매자 없음';
             const quantity = campaign.quantity || 0;
@@ -82,12 +79,23 @@ function SellerHome() {
         });
     }, [campaigns, sellers]);
   
+    // 달력의 각 날짜 셀 내용 렌더링
     const renderSellerDayCell = (dayCellInfo) => {
         const dateStr = formatDate(dayCellInfo.date);
         const capacity = capacities[dateStr] || 0;
         
-        const dailyEvents = Array.isArray(dayCellInfo.events) ? dayCellInfo.events : [];
-        const totalQuantity = dailyEvents.reduce((sum, event) => sum + Number(event.extendedProps?.quantity || 0), 0);
+        // ✅ [수정된 부분]
+        // dayCellInfo.events 대신, 전체 events 상태에서 직접 해당 날짜의 이벤트를 필터링합니다.
+        // 이것이 가장 확실하고 정확한 방법입니다.
+        const dailyEvents = events.filter(event => 
+            formatDate(new Date(event.start)) === dateStr
+        );
+        
+        const totalQuantity = dailyEvents.reduce((sum, event) => {
+            // quantity가 문자열일 수 있으므로 숫자로 변환
+            const quantity = Number(event.extendedProps?.quantity || 0);
+            return sum + quantity;
+        }, 0);
         
         const remaining = capacity - totalQuantity;
         const remainingColor = remaining > 0 ? 'text-blue-600' : 'text-red-500';
