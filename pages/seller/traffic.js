@@ -24,7 +24,6 @@ export default function TrafficPage() {
     }))
   );
 
-  // ✅ [추가] 카테고리별 상품 개수를 미리 계산 (rowSpan에 사용)
   const categoryCounts = useMemo(() => {
     const counts = {};
     products.forEach(p => {
@@ -32,7 +31,6 @@ export default function TrafficPage() {
     });
     return counts;
   }, [products]);
-
 
   const handleInputChange = (index, field, value) => {
     const newProducts = [...products];
@@ -43,8 +41,9 @@ export default function TrafficPage() {
 
   const totalEstimate = products.reduce((sum, p) => sum + (p.salePrice * p.quantity), 0);
 
-  const thClass = "px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-100";
-  const tdClass = "px-4 py-3 whitespace-nowrap text-sm text-gray-800 border-b border-gray-200";
+  // ✅ [수정] 헤더와 셀 스타일에 오른쪽 테두리 추가
+  const thClass = "px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider bg-gray-100 border-b border-r border-gray-200";
+  const tdClass = "px-4 py-3 whitespace-nowrap text-sm text-gray-800 border-b border-r border-gray-200";
   const inputClass = "w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-center";
 
   return (
@@ -63,7 +62,6 @@ export default function TrafficPage() {
           <table className="min-w-full">
             <thead>
               <tr>
-                {/* ✅ [수정] 테이블 헤더 정의 */}
                 <th className={`${thClass} w-40`}>구분</th>
                 <th className={thClass}>상품명</th>
                 <th className={thClass}>설명</th>
@@ -72,7 +70,8 @@ export default function TrafficPage() {
                 <th className={`${thClass} w-40`}>요청일자</th>
                 <th className={`${thClass} w-32`}>시작일자</th>
                 <th className={`${thClass} w-32`}>종료일자</th>
-                <th className={`${thClass} w-36`}>트래픽 견적</th>
+                {/* ✅ [수정] 마지막 헤더에는 오른쪽 테두리 제거 */}
+                <th className={`${thClass} w-36 border-r-0`}>트래픽 견적</th>
               </tr>
             </thead>
             <tbody className="bg-white">
@@ -81,16 +80,13 @@ export default function TrafficPage() {
                 const endDate = startDate ? new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000) : null;
                 const estimate = p.salePrice * p.quantity;
 
-                // ✅ [추가] 그룹화 및 경계선 렌더링을 위한 로직
                 const prevCategory = index > 0 ? products[index - 1].category : null;
                 const isFirstOfCategory = p.category !== prevCategory;
                 const rowSpanCount = isFirstOfCategory ? categoryCounts[p.category] : 0;
 
                 return (
-                  // 그룹이 바뀔 때 상단에 경계선 추가
                   <tr key={index} className={isFirstOfCategory && index > 0 ? 'border-t-2 border-gray-300' : ''}>
                     
-                    {/* 카테고리의 첫번째 행일 때만 '구분' 셀 렌더링 */}
                     {isFirstOfCategory && (
                       <td rowSpan={rowSpanCount} className={`${tdClass} align-middle text-center font-bold bg-gray-50`}>
                         {p.category}
@@ -131,7 +127,8 @@ export default function TrafficPage() {
                     <td className={tdClass}>
                       {endDate ? endDate.toLocaleDateString() : '-'}
                     </td>
-                    <td className={`${tdClass} font-bold text-lg text-green-600`}>
+                    {/* ✅ [수정] 마지막 셀에는 오른쪽 테두리 제거 */}
+                    <td className={`${tdClass} font-bold text-lg text-green-600 border-r-0`}>
                       {estimate.toLocaleString()}원
                     </td>
                   </tr>
