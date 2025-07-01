@@ -210,14 +210,104 @@ export default function DashboardPage() {
 
                 {/* --- 새 작업 추가 폼 (기존과 동일) --- */}
                 <form onSubmit={handleAddCampaign} className="p-6 bg-white rounded-xl shadow-lg mb-8">
-                    {/* ... form 내부 내용은 생략 (기존 코드와 동일) ... */}
+                    <h2 className="text-2xl font-bold mb-6 text-gray-700">새 작업 추가</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 items-end">
+                        <div>
+                            <label className={labelClass}>진행 일자</label>
+                            <DatePicker selected={formState.date} onChange={(date) => setFormState(p => ({ ...p, date }))} className={inputClass} />
+                        </div>
+                        <div>
+                            <label className={labelClass}>구분</label>
+                            <select name="deliveryType" value={formState.deliveryType} onChange={handleFormChange} className={inputClass}>
+                                <option value="실배송">실배송</option>
+                                <option value="빈박스">빈박스</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className={labelClass}>리뷰 종류</label>
+                            <select name="reviewType" value={formState.reviewType} onChange={handleFormChange} className={inputClass}>
+                                {formState.deliveryType === '실배송' ? (
+                                    <> <option>별점</option><option>텍스트</option><option>포토</option><option>프리미엄(포토)</option><option>프리미엄(영상)</option> </>
+                                ) : (
+                                    <> <option>별점</option><option>텍스트</option> </>
+                                )}
+                            </select>
+                        </div>
+                        <div>
+                            <label className={labelClass}>작업 개수</label>
+                            <input type="number" name="quantity" value={formState.quantity} onChange={handleFormChange} className={inputClass} min="1" required />
+                        </div>
+                        <div className="md:col-span-2 xl:col-span-1">
+                            <label className={labelClass}>상품명</label>
+                            <input type="text" name="productName" value={formState.productName} onChange={handleFormChange} className={inputClass} placeholder="예: 저자극 샴푸" required />
+                        </div>
+                        <div>
+                            <label className={labelClass}>옵션</label>
+                            <input type="text" name="productOption" value={formState.productOption} onChange={handleFormChange} className={inputClass} placeholder="예: 500ml 1개" />
+                        </div>
+                        <div>
+                            <label className={labelClass}>상품가 (개당)</label>
+                            <input type="number" name="productPrice" value={formState.productPrice} onChange={handleFormChange} className={inputClass} placeholder="0" />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className={labelClass}>상품 URL</label>
+                            <input type="url" name="productUrl" value={formState.productUrl} onChange={handleFormChange} className={inputClass} placeholder="https://..." />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className={labelClass}>키워드</label>
+                            <input type="text" name="keywords" value={formState.keywords} onChange={handleFormChange} className={inputClass} placeholder="1개만 입력" />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className={labelClass}>리뷰 가이드</label>
+                            <textarea name="reviewGuide" value={formState.reviewGuide} onChange={handleFormChange} className={inputClass} rows="2"></textarea>
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className={labelClass}>비고</label>
+                            <input type="text" name="remarks" value={formState.remarks} onChange={handleFormChange} className={inputClass} />
+                        </div>
+                        <div className="md:col-span-full xl:col-span-1 flex items-end">
+                            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md">
+                                견적에 추가
+                            </button>
+                        </div>
+                    </div>
+                    <div className="mt-6 p-4 border-t border-gray-200 flex justify-end items-center space-x-6">
+                        <div><span className="text-sm text-gray-500">기본 단가:</span><span className="ml-2 font-semibold">{basePrice.toLocaleString()}원</span></div>
+                        <span className="text-gray-400">+</span>
+                        <div><span className="text-sm text-gray-500">일요일 가산금:</span><span className={`ml-2 font-semibold ${sundayExtraCharge > 0 ? 'text-red-500' : ''}`}>{sundayExtraCharge.toLocaleString()}원</span></div>
+                        <span className="text-gray-400">=</span>
+                        <div><span className="text-sm text-gray-500">최종 개당 단가:</span><span className="ml-2 font-bold text-lg text-blue-600">{finalUnitPrice.toLocaleString()}원</span></div>
+                    </div>
                 </form>
 
                 <div className="p-6 bg-white rounded-xl shadow-lg">
                     <h2 className="text-2xl font-bold mb-4 text-gray-700">견적 목록 (스프레드시트)</h2>
                     {/* --- 견적 목록 테이블 (기존과 동일) --- */}
                     <div className="overflow-x-auto">
-                        {/* ... table 내용은 생략 (기존 코드와 동일) ... */}
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-100">
+                                <tr>{['순번', '진행일자', '리뷰 종류', '상품명', '상품가', '작업개수', '견적 상세', '총 견적', '작업'].map(h => <th key={h} className={thClass}>{h}</th>)}</tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {campaigns.length === 0 ? (
+                                    <tr><td colSpan="9" className="text-center py-10 text-gray-500">위에서 작업을 추가해주세요.</td></tr>
+                                ) : (
+                                    campaigns.map((c, index) => (
+                                        <tr key={c.id}>
+                                            <td className={tdClass}>{index + 1}</td>
+                                            <td className={tdClass}><span className={c.date.getDay() === 0 ? 'text-red-500 font-bold' : ''}>{c.date.toLocaleDateString()}</span></td>
+                                            <td className={tdClass}>{c.reviewType}</td>
+                                            <td className={tdClass}>{c.productName}</td>
+                                            <td className={tdClass}>{Number(c.productPrice).toLocaleString()}원</td>
+                                            <td className={tdClass}>{c.quantity}</td>
+                                            <td className={tdClass + " text-xs text-gray-500"}>(리뷰 {c.finalUnitPrice.toLocaleString()} + 상품가 {Number(c.productPrice).toLocaleString()}) * {c.quantity}개</td>
+                                            <td className={`${tdClass} font-bold`}>{c.itemTotal.toLocaleString()}원</td>
+                                            <td className={tdClass}><button onClick={() => handleDeleteCampaign(c.id)} className="text-red-600 hover:text-red-800 font-semibold">삭제</button></td>
+                                        </tr>
+                                    ))
+                                )}
+                            </tbody>
+                        </table>
                     </div>
 
                     {/* ✅ [수정] 최종 결제 금액 및 예치금 사용 UI */}
