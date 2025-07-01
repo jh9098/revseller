@@ -1,3 +1,6 @@
+// 데이터 구조가 올바르다는 가정 하에, 이 코드는 정상 작동합니다.
+// Firestore의 `campaigns` 컬렉션에 `sellerId`를 추가/수정하는 것이 해결 방법입니다.
+
 import { useEffect, useState, useMemo } from 'react';
 import SellerLayout from '../../components/seller/SellerLayout';
 import { db } from '../../lib/firebase';
@@ -7,7 +10,6 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from "@fullcalendar/interaction";
 
-// 날짜를 'YYYY-MM-DD' 형식의 문자열로 변환하는 함수
 const formatDate = (date) => {
     if (!date || !(date instanceof Date)) return '';
     const year = date.getFullYear();
@@ -17,14 +19,11 @@ const formatDate = (date) => {
 };
 
 function SellerHome() {
-    // Firestore에서 가져온 원본 데이터를 저장하는 상태
     const [campaigns, setCampaigns] = useState([]);
-    const [sellers, setSellers] = useState({}); // sellers 컬렉션 데이터 (id: nickname 맵)
+    const [sellers, setSellers] = useState({});
     const [capacities, setCapacities] = useState({});
 
-    // Firestore 데이터 실시간 감지
     useEffect(() => {
-        // Sellers 컬렉션 감지 (판매자 닉네임 가져오기)
         const sellerUnsubscribe = onSnapshot(collection(db, 'sellers'), (snap) => {
             const fetchedSellers = {};
             snap.forEach(doc => {
@@ -33,7 +32,6 @@ function SellerHome() {
             setSellers(fetchedSellers);
         });
 
-        // Campaigns 컬렉션 감지
         const campaignUnsubscribe = onSnapshot(collection(db, 'campaigns'), (snap) => {
             const fetchedCampaigns = snap.docs.map(d => ({
                 id: d.id,
@@ -42,7 +40,6 @@ function SellerHome() {
             setCampaigns(fetchedCampaigns);
         });
         
-        // Capacities 컬렉션 감지
         const capacityUnsubscribe = onSnapshot(collection(db, 'capacities'), (snap) => {
             const fetchedCaps = {};
             snap.forEach(doc => { 
@@ -51,7 +48,6 @@ function SellerHome() {
             setCapacities(fetchedCaps);
         });
 
-        // 컴포넌트 언마운트 시 리스너 정리
         return () => { 
             sellerUnsubscribe();
             campaignUnsubscribe(); 
@@ -59,15 +55,17 @@ function SellerHome() {
         };
     }, []);
 
-    // campaigns 또는 sellers 데이터가 변경될 때만 FullCalendar 이벤트를 다시 계산
     const events = useMemo(() => {
-        // sellers 데이터가 로드될 때까지 기다림
         if (Object.keys(sellers).length === 0) return [];
 
         return campaigns.map(campaign => {
-            // sellerId로 닉네임 찾기
-            const nickname = sellers[campaign.sellerId] || '판매자 없음';
+            const sellerId = campaign.sellerId;
+            const nickname = sellers[sellerId] || '판매자 없음';
             const quantity = campaign.quantity || 0;
+
+            if (!sellerId || !sellers[sellerId]) {
+                console.warn(`캠페인(ID: ${campaign.id})에서 판매자 닉네임을 찾을 수 없습니다. sellerId:`, sellerId);
+            }
 
             const eventDate = campaign.date?.seconds 
                 ? new Date(campaign.date.seconds * 1000) 
@@ -75,7 +73,7 @@ function SellerHome() {
             
             return {
                 id: campaign.id,
-                title: `${nickname} (${quantity}개)`, // 요구사항에 맞게 '닉네임 (개수)'로 변경
+                title: `${nickname} (${quantity}개)`,
                 start: eventDate,
                 allDay: true,
                 extendedProps: { 
@@ -83,14 +81,12 @@ function SellerHome() {
                 }
             };
         });
-    }, [campaigns, sellers]); // sellers가 변경될 때도 이벤트를 다시 계산하도록 추가
+    }, [campaigns, sellers]);
   
-    // 달력의 각 날짜 셀 내용 렌더링
     const renderSellerDayCell = (dayCellInfo) => {
         const dateStr = formatDate(dayCellInfo.date);
         const capacity = capacities[dateStr] || 0;
         
-        // FullCalendar가 전달하는 해당 날짜의 이벤트 목록을 사용
         const dailyEvents = Array.isArray(dayCellInfo.events) ? dayCellInfo.events : [];
         const totalQuantity = dailyEvents.reduce((sum, event) => sum + Number(event.extendedProps?.quantity || 0), 0);
         
@@ -124,11 +120,7 @@ function SellerHome() {
                 <FullCalendar
                     plugins={[dayGridPlugin, interactionPlugin]}
                     initialView="dayGridMonth"
-                    headerToolbar={{
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: ''
-                    }}
+                    headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
                     buttonText={{ today: 'today' }}
                     events={events}
                     dayCellContent={renderSellerDayCell}
