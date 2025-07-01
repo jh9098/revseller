@@ -48,35 +48,32 @@ const CapacityInput = ({ dateStr, initialValue }) => {
 
 // 메인 관리자 스케줄 컴포넌트
 function AdminSchedule() {
-    // Firestore에서 가져온 원본 데이터를 저장하는 상태
-    const [campaigns, setCampaigns] = useState([]); // campaigns 컬렉션 데이터
-    const [sellers, setSellers] = useState({});     // sellers 컬렉션 데이터 (id: nickname 맵)
-    const [capacities, setCapacities] = useState({}); // capacities 컬렉션 데이터
-
+    const [campaigns, setCampaigns] = useState([]);
+    const [sellers, setSellers] = useState({}); // { "사용자UID": "닉네임" } 형태의 맵
+    const [capacities, setCapacities] = useState({});
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
-    // Firestore 데이터 실시간 감지
     useEffect(() => {
-        // Sellers 컬렉션 감지 (판매자 닉네임 가져오기)
+        // ✅ sellers 문서의 uid 필드를 key로 사용하여 맵 생성
         const sellerUnsubscribe = onSnapshot(collection(db, 'sellers'), (snap) => {
             const fetchedSellers = {};
             snap.forEach(doc => {
-                // doc.id를 key로, nickname을 value로 저장
-                fetchedSellers[doc.id] = doc.data().nickname || '이름없음';
+                const data = doc.data();
+                if (data.uid) {
+                    fetchedSellers[data.uid] = data.nickname || '이름없음';
+                }
             });
             setSellers(fetchedSellers);
         });
 
-        // Campaigns 컬렉션 감지
         const campaignUnsubscribe = onSnapshot(collection(db, 'campaigns'), (snap) => {
             const fetchedCampaigns = snap.docs.map(d => ({
                 id: d.id,
-                ...d.data() // 원본 데이터 전부 저장
+                ...d.data()
             }));
             setCampaigns(fetchedCampaigns);
         });
 
-        // Capacities 컬렉션 감지
         const capacityUnsubscribe = onSnapshot(collection(db, 'capacities'), (snap) => {
             const fetchedCaps = {};
             snap.forEach(doc => {
@@ -85,7 +82,6 @@ function AdminSchedule() {
             setCapacities(fetchedCaps);
         });
 
-        // 컴포넌트 언마운트 시 리스너 정리
         return () => {
             sellerUnsubscribe();
             campaignUnsubscribe();
@@ -93,24 +89,22 @@ function AdminSchedule() {
         };
     }, []);
     
-    // campaigns 또는 sellers 데이터가 변경될 때만 FullCalendar 이벤트를 다시 계산
     const events = useMemo(() => {
-        // sellers 데이터가 아직 로드되지 않았으면 빈 배열 반환
         if (Object.keys(sellers).length === 0) return [];
 
         return campaigns.map(campaign => {
-            // sellerId를 이용해 판매자 닉네임 찾기
-            const nickname = sellers[campaign.sellerId] || '판매자 없음';
+            // ✅ campaigns 문서의 sellerUid 필드를 사용하여 닉네임 조회
+            const sellerUid = campaign.sellerUid;
+            const nickname = sellers[sellerUid] || '판매자 없음';
             const quantity = campaign.quantity || 0;
             
-            // 날짜 데이터 변환 (Timestamp 객체 또는 문자열 대응)
             const eventDate = campaign.date?.seconds 
                 ? new Date(campaign.date.seconds * 1000) 
                 : new Date(campaign.date);
 
             return {
                 id: campaign.id,
-                title: `${nickname} (${quantity}개)`, // 요구사항: 닉네임 (갯수)
+                title: `${nickname} (${quantity}개)`,
                 start: eventDate,
                 allDay: true,
                 extendedProps: { 
@@ -118,7 +112,7 @@ function AdminSchedule() {
                 }
             };
         });
-    }, [campaigns, sellers]); // campaigns나 sellers가 변경될 때만 실행
+    }, [campaigns, sellers]);
 
     // 달력의 월이 변경될 때 호출되어 현재 월 정보를 업데이트
     const handleDatesSet = (dateInfo) => {

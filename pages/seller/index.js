@@ -1,6 +1,3 @@
-// 데이터 구조가 올바르다는 가정 하에, 이 코드는 정상 작동합니다.
-// Firestore의 `campaigns` 컬렉션에 `sellerId`를 추가/수정하는 것이 해결 방법입니다.
-
 import { useEffect, useState, useMemo } from 'react';
 import SellerLayout from '../../components/seller/SellerLayout';
 import { db } from '../../lib/firebase';
@@ -20,14 +17,19 @@ const formatDate = (date) => {
 
 function SellerHome() {
     const [campaigns, setCampaigns] = useState([]);
-    const [sellers, setSellers] = useState({});
+    const [sellers, setSellers] = useState({}); // { "사용자UID": "닉네임" } 형태의 맵
     const [capacities, setCapacities] = useState({});
 
     useEffect(() => {
+        // Sellers 컬렉션에서 'uid'를 key로, 'nickname'을 value로 하는 맵을 생성
         const sellerUnsubscribe = onSnapshot(collection(db, 'sellers'), (snap) => {
             const fetchedSellers = {};
             snap.forEach(doc => {
-                fetchedSellers[doc.id] = doc.data().nickname || '이름없음';
+                const data = doc.data();
+                // ✅ sellers 문서의 uid 필드를 key로 사용
+                if (data.uid) {
+                    fetchedSellers[data.uid] = data.nickname || '이름없음';
+                }
             });
             setSellers(fetchedSellers);
         });
@@ -59,13 +61,10 @@ function SellerHome() {
         if (Object.keys(sellers).length === 0) return [];
 
         return campaigns.map(campaign => {
-            const sellerId = campaign.sellerId;
-            const nickname = sellers[sellerId] || '판매자 없음';
+            // ✅ campaigns 문서의 sellerUid 필드를 사용하여 닉네임 조회
+            const sellerUid = campaign.sellerUid;
+            const nickname = sellers[sellerUid] || '판매자 없음';
             const quantity = campaign.quantity || 0;
-
-            if (!sellerId || !sellers[sellerId]) {
-                console.warn(`캠페인(ID: ${campaign.id})에서 판매자 닉네임을 찾을 수 없습니다. sellerId:`, sellerId);
-            }
 
             const eventDate = campaign.date?.seconds 
                 ? new Date(campaign.date.seconds * 1000) 
