@@ -19,10 +19,20 @@ const formatDate = (date) => {
 function SellerHome() {
     // Firestore에서 가져온 원본 데이터를 저장하는 상태
     const [campaigns, setCampaigns] = useState([]);
+    const [sellers, setSellers] = useState({}); // sellers 컬렉션 데이터 (id: nickname 맵)
     const [capacities, setCapacities] = useState({});
 
     // Firestore 데이터 실시간 감지
     useEffect(() => {
+        // Sellers 컬렉션 감지 (판매자 닉네임 가져오기)
+        const sellerUnsubscribe = onSnapshot(collection(db, 'sellers'), (snap) => {
+            const fetchedSellers = {};
+            snap.forEach(doc => {
+                fetchedSellers[doc.id] = doc.data().nickname || '이름없음';
+            });
+            setSellers(fetchedSellers);
+        });
+
         // Campaigns 컬렉션 감지
         const campaignUnsubscribe = onSnapshot(collection(db, 'campaigns'), (snap) => {
             const fetchedCampaigns = snap.docs.map(d => ({
@@ -43,36 +53,44 @@ function SellerHome() {
 
         // 컴포넌트 언마운트 시 리스너 정리
         return () => { 
+            sellerUnsubscribe();
             campaignUnsubscribe(); 
             capacityUnsubscribe(); 
         };
     }, []);
 
-    // campaigns 데이터가 변경될 때만 FullCalendar 이벤트를 다시 계산
+    // campaigns 또는 sellers 데이터가 변경될 때만 FullCalendar 이벤트를 다시 계산
     const events = useMemo(() => {
+        // sellers 데이터가 로드될 때까지 기다림
+        if (Object.keys(sellers).length === 0) return [];
+
         return campaigns.map(campaign => {
+            // sellerId로 닉네임 찾기
+            const nickname = sellers[campaign.sellerId] || '판매자 없음';
+            const quantity = campaign.quantity || 0;
+
             const eventDate = campaign.date?.seconds 
                 ? new Date(campaign.date.seconds * 1000) 
                 : new Date(campaign.date);
             
             return {
                 id: campaign.id,
-                title: `예약 (${campaign.quantity || 0}개)`, // 판매자 페이지에서는 닉네임 없이 표시
+                title: `${nickname} (${quantity}개)`, // 요구사항에 맞게 '닉네임 (개수)'로 변경
                 start: eventDate,
                 allDay: true,
                 extendedProps: { 
-                    quantity: campaign.quantity || 0 
+                    quantity: quantity 
                 }
             };
         });
-    }, [campaigns]);
+    }, [campaigns, sellers]); // sellers가 변경될 때도 이벤트를 다시 계산하도록 추가
   
     // 달력의 각 날짜 셀 내용 렌더링
     const renderSellerDayCell = (dayCellInfo) => {
         const dateStr = formatDate(dayCellInfo.date);
         const capacity = capacities[dateStr] || 0;
         
-        // FullCalendar가 전달하는 해당 날짜의 이벤트 목록을 사용 (더 효율적)
+        // FullCalendar가 전달하는 해당 날짜의 이벤트 목록을 사용
         const dailyEvents = Array.isArray(dayCellInfo.events) ? dayCellInfo.events : [];
         const totalQuantity = dailyEvents.reduce((sum, event) => sum + Number(event.extendedProps?.quantity || 0), 0);
         
@@ -81,7 +99,6 @@ function SellerHome() {
         const remainingTextSize = remaining > 0 ? 'text-2xl' : 'text-lg';
 
         return (
-            // 스크린샷과 유사한 레이아웃으로 수정
             <>
                 <div className="absolute top-1 right-1 text-sm text-gray-600">{dayCellInfo.dayNumberText}</div>
                 <div className="flex flex-col items-center justify-center h-full pt-2">
@@ -110,17 +127,17 @@ function SellerHome() {
                     headerToolbar={{
                         left: 'prev,next today',
                         center: 'title',
-                        right: '' // 오른쪽 버튼 제거
+                        right: ''
                     }}
                     buttonText={{ today: 'today' }}
                     events={events}
                     dayCellContent={renderSellerDayCell}
-                    dayCellClassNames="relative h-28" // 셀의 상대 위치 기준 및 높이 지정
+                    dayCellClassNames="relative h-28" 
                     locale="ko"
                     height="auto"
                     timeZone='local'
-                    eventDisplay="list-item" // 이벤트를 리스트 아이템('•' 포함)처럼 표시
-                    eventColor="#374151" // 이벤트 마커 색상 (회색)
+                    eventDisplay="list-item" 
+                    eventColor="#374151" 
                 />
             </div>
         </SellerLayout>
