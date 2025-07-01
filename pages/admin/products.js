@@ -1,6 +1,6 @@
+//P:\revseller\pages\admin\products.js
 import { useState, useEffect } from 'react';
 import { db } from '../../lib/firebase';
-// ✅ [수정] writeBatch, increment 추가
 import { collection, query, onSnapshot, doc, updateDoc, orderBy, writeBatch, increment } from 'firebase/firestore';
 import AdminLayout from '../../components/admin/AdminLayout';
 import withAdminAuth from '../../hoc/withAdminAuth';
@@ -38,40 +38,78 @@ function CampaignManagement() {
     }
   };
 
-  // ✅ [추가] 판매자 귀책 취소 및 예치금 적립 함수
+  // ✅ [수정] 판매자 귀책 취소 및 예치금 적립 함수 (부분 취소 기능 추가)
   const handleCancelBySellerFault = async (campaign) => {
-    // 1. 필요한 정보가 있는지 확인
-    const { id, sellerUid, productPrice, quantity } = campaign;
-    if (!sellerUid || productPrice === undefined || quantity === undefined) {
-      alert("필수 정보(판매자UID, 상품가, 수량)가 없어 처리할 수 없습니다.");
+    // 1. 필요한 정보가 있는지 확인 (itemTotal 추가)
+    const { id, sellerUid, productPrice, quantity, itemTotal } = campaign;
+    if (!sellerUid || productPrice === undefined || quantity === undefined || itemTotal === undefined) {
+      alert("필수 정보(판매자UID, 상품가, 수량, 총 견적)가 없어 처리할 수 없습니다.");
       return;
     }
 
-    // 2. 관리자에게 재확인
-    const refundAmount = Number(productPrice) * Number(quantity);
-    const confirmation = confirm(
-      `정말로 이 캠페인을 '판매자 귀책'으로 취소하시겠습니까?\n` +
-      `판매자에게 ${refundAmount.toLocaleString()}원의 예치금이 적립됩니다.`
-    );
+    // 2. 관리자로부터 취소할 수량 입력받기
+    const cancelQtyStr = prompt(`취소할 수량을 입력하세요. (현재 수량: ${quantity}개)`, quantity.toString());
+
+    // prompt에서 '취소'를 누르거나 값을 입력하지 않은 경우
+    if (cancelQtyStr === null || cancelQtyStr === "") {
+      return; 
+    }
+
+    const cancelQty = parseInt(cancelQtyStr, 10);
+
+    // 3. 입력값 유효성 검사
+    if (isNaN(cancelQty) || cancelQty <= 0) {
+      alert("유효한 숫자를 입력하세요.");
+      return;
+    }
+    if (cancelQty > quantity) {
+      alert(`취소할 수량이 현재 수량(${quantity}개)보다 많습니다.`);
+      return;
+    }
+
+    // 4. 환불액 및 캠페인 잔여 정보 계산
+    const refundAmount = Number(productPrice) * cancelQty; // 예치금으로 환불될 금액 (상품가 기준)
+    const remainingQty = Number(quantity) - cancelQty;
+
+    // 5. 관리자에게 최종 확인
+    const confirmationMessage = 
+      `정말로 이 캠페인의 수량을 ${cancelQty}개 취소하시겠습니까?\n` +
+      `판매자에게 상품가 기준 ${refundAmount.toLocaleString()}원의 예치금이 적립됩니다.\n\n` +
+      (remainingQty > 0 ? `캠페인의 남은 수량은 ${remainingQty}개가 됩니다.` : "캠페인이 전체 취소 처리됩니다.");
+    
+    const confirmation = confirm(confirmationMessage);
 
     if (!confirmation) return;
 
-    // 3. Firestore 문서 참조 생성
+    // 6. Firestore 문서 참조 생성 및 Batch Write 준비
     const campaignDocRef = doc(db, 'campaigns', id);
     const sellerDocRef = doc(db, 'sellers', sellerUid);
-
-    // 4. Batch Write를 사용하여 원자적 업데이트 실행
     const batch = writeBatch(db);
 
-    // 4-1. 캠페인 상태를 '판매자귀책취소'로 변경
-    batch.update(campaignDocRef, { status: '판매자귀책취소' });
+    // 7. 부분 취소와 전체 취소에 따라 다른 작업 수행
+    if (remainingQty > 0) {
+      // 부분 취소: 캠페인 수량과 견적 금액 업데이트
+      // 개당 서비스 단가 계산 = (총 견적 / 수량) - 개당 상품가
+      const unitServicePrice = (Number(itemTotal) / Number(quantity)) - Number(productPrice);
+      // 새로운 총 견적 = (개당 서비스 단가 + 개당 상품가) * 남은 수량
+      const newItemTotal = (unitServicePrice + Number(productPrice)) * remainingQty;
+
+      batch.update(campaignDocRef, { 
+        quantity: remainingQty,
+        itemTotal: newItemTotal 
+      });
+
+    } else {
+      // 전체 취소: 캠페인 상태를 '판매자귀책취소'로 변경
+      batch.update(campaignDocRef, { status: '판매자귀책취소' });
+    }
     
-    // 4-2. 판매자 예치금을 (상품가 * 수량) 만큼 증가
+    // 8. 판매자 예치금을 (취소 상품가 * 취소 수량) 만큼 증가 (항상 실행)
     batch.update(sellerDocRef, { deposit: increment(refundAmount) });
 
     try {
       await batch.commit();
-      alert("캠페인이 취소되고 예치금이 성공적으로 적립되었습니다.");
+      alert("작업이 성공적으로 처리되었습니다.");
     } catch (error) {
       console.error("취소 및 예치금 적립 처리 중 오류:", error);
       alert("작업 처리 중 오류가 발생했습니다.");
@@ -84,7 +122,6 @@ function CampaignManagement() {
       return;
     }
 
-    // ✅ 방어 코드 추가: 각 필드의 값이 없을 경우 빈 문자열 ''을 사용
     const dataForExcel = campaigns.map((c, index) => ({
       '순번': index + 1,
       '진행일자': c.date && c.date.seconds ? new Date(c.date.seconds * 1000).toLocaleDateString() : '',
@@ -114,6 +151,7 @@ function CampaignManagement() {
     link.click();
     document.body.removeChild(link);
   };
+
   return (
     <AdminLayout>
       <div className="flex justify-between items-center mb-6">
@@ -146,12 +184,11 @@ function CampaignManagement() {
                     <td className="px-3 py-4 whitespace-nowrap text-sm">{typeof c.itemTotal === 'number' ? c.itemTotal.toLocaleString() + '원' : '견적 없음'}</td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm">
                       <span
-                        // ✅ [수정] '판매자귀책취소' 상태 UI 추가
                         className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                           c.status === '리뷰완료' ? 'bg-blue-100 text-blue-800' :
                           c.status === '구매완료' ? 'bg-green-200 text-green-800' :
                           c.status === '예약 확정' ? 'bg-green-100 text-green-800' :
-                          c.status === '판매자귀책취소' ? 'bg-red-100 text-red-800' : // <-- 추가
+                          c.status === '판매자귀책취소' ? 'bg-red-100 text-red-800' :
                           'bg-yellow-100 text-yellow-800'
                         }`}
                       >
@@ -165,8 +202,8 @@ function CampaignManagement() {
                       {c.status !== '구매완료' && <button onClick={() => handleUpdateStatus(c.id, '구매완료')} className="text-green-600 hover:text-green-800">구매완료</button>}
                       {c.status !== '리뷰완료' && <button onClick={() => handleUpdateStatus(c.id, '리뷰완료')} className="text-blue-600 hover:text-blue-800">리뷰완료</button>}
                       
-                      {/* ✅ [추가] 판매자 귀책 취소 버튼 (조건부 렌더링) */}
-                      {c.status === '예약 확정' && (
+                      {/* ✅ [수정] '예약 확정' 및 '구매완료' 상태일 때 귀책 취소 버튼 렌더링 */}
+                      {(c.status === '예약 확정' || c.status === '구매완료') && (
                         <button onClick={() => handleCancelBySellerFault(c)} className="text-red-600 hover:text-red-800 font-semibold">귀책 취소</button>
                       )}
                     </td>
@@ -181,3 +218,4 @@ function CampaignManagement() {
 }
 
 export default withAdminAuth(CampaignManagement);
+
