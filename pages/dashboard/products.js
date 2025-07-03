@@ -274,7 +274,7 @@ export default function DashboardPage() {
                     <div className="mt-6 p-4 border-t border-gray-200 flex justify-end items-center space-x-6">
                         <div><span className="text-sm text-gray-500">기본 단가:</span><span className="ml-2 font-semibold">{basePrice.toLocaleString()}원</span></div>
                         <span className="text-gray-400">+</span>
-                        <div><span className="text-sm text-gray-500">일요일 가산금:</span><span className={`ml-2 font-semibold ${sundayExtraCharge > 0 ? 'text-red-500' : ''}`}>{sundayExtraCharge.toLocaleString()}원</span></div>
+                        <div><span className="text-sm text-gray-500">공휴일 가산금:</span><span className={`ml-2 font-semibold ${sundayExtraCharge > 0 ? 'text-red-500' : ''}`}>{sundayExtraCharge.toLocaleString()}원</span></div>
                         <span className="text-gray-400">=</span>
                         <div><span className="text-sm text-gray-500">최종 개당 단가:</span><span className="ml-2 font-bold text-lg text-blue-600">{finalUnitPrice.toLocaleString()}원</span></div>
                     </div>

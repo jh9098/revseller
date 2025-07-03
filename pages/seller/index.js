@@ -7,6 +7,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from "@fullcalendar/interaction";
 
+// 날짜를 'YYYY-MM-DD' 형식의 문자열로 변환하는 헬퍼 함수
 const formatDate = (date) => {
     if (!date || !(date instanceof Date)) return '';
     const year = date.getFullYear();
@@ -21,6 +22,7 @@ function SellerHome() {
     const [capacities, setCapacities] = useState({});
 
     useEffect(() => {
+        // 'sellers' 컬렉션에서 판매자 정보(uid: nickname)를 실시간으로 가져옵니다.
         const sellerUnsubscribe = onSnapshot(collection(db, 'sellers'), (snap) => {
             const fetchedSellers = {};
             snap.forEach(doc => {
@@ -32,6 +34,7 @@ function SellerHome() {
             setSellers(fetchedSellers);
         });
 
+        // 'campaigns' 컬렉션에서 모든 예약 정보를 실시간으로 가져옵니다.
         const campaignUnsubscribe = onSnapshot(collection(db, 'campaigns'), (snap) => {
             const fetchedCampaigns = snap.docs.map(d => ({
                 id: d.id,
@@ -40,6 +43,7 @@ function SellerHome() {
             setCampaigns(fetchedCampaigns);
         });
         
+        // 'capacities' 컬렉션에서 날짜별 잔여 수량 정보를 실시간으로 가져옵니다.
         const capacityUnsubscribe = onSnapshot(collection(db, 'capacities'), (snap) => {
             const fetchedCaps = {};
             snap.forEach(doc => { 
@@ -48,6 +52,7 @@ function SellerHome() {
             setCapacities(fetchedCaps);
         });
 
+        // 컴포넌트가 언마운트될 때 Firestore 리스너를 정리합니다.
         return () => { 
             sellerUnsubscribe();
             campaignUnsubscribe(); 
@@ -55,58 +60,86 @@ function SellerHome() {
         };
     }, []);
 
+    // ✅ [핵심 수정 부분] campaigns 데이터를 그룹화하여 events 배열을 생성합니다.
     const events = useMemo(() => {
-        if (Object.keys(sellers).length === 0) return [];
+        if (Object.keys(sellers).length === 0 || campaigns.length === 0) return [];
 
-        return campaigns.map(campaign => {
-            const sellerUid = campaign.sellerUid;
-            const nickname = sellers[sellerUid] || '판매자 없음';
-            const quantity = campaign.quantity || 0;
+        // 1. 날짜와 닉네임별로 수량을 합산하기 위한 중간 데이터 구조
+        // ex: { '2025-07-01': { '꿀꿀이': 1, '바르르': 211 }, ... }
+        const dailyAggregates = {};
 
+        campaigns.forEach(campaign => {
             const eventDate = campaign.date?.seconds 
                 ? new Date(campaign.date.seconds * 1000) 
                 : new Date(campaign.date);
             
-            return {
-                id: campaign.id,
-                title: `${nickname} (${quantity}개)`,
-                start: eventDate,
-                allDay: true,
-                extendedProps: { 
-                    quantity: quantity 
-                }
-            };
+            const dateStr = formatDate(eventDate);
+            if (!dateStr) return; // 유효하지 않은 날짜는 건너뜁니다.
+
+            const nickname = sellers[campaign.sellerUid] || '판매자 없음';
+            const quantity = Number(campaign.quantity) || 0;
+
+            // 해당 날짜의 집계 객체가 없으면 생성합니다.
+            if (!dailyAggregates[dateStr]) {
+                dailyAggregates[dateStr] = {};
+            }
+            // 해당 날짜, 해당 닉네임의 수량을 합산합니다.
+            if (!dailyAggregates[dateStr][nickname]) {
+                dailyAggregates[dateStr][nickname] = 0;
+            }
+            dailyAggregates[dateStr][nickname] += quantity;
         });
+
+        // 2. 집계된 데이터를 FullCalendar 이벤트 형식으로 변환합니다.
+        const aggregatedEvents = [];
+        for (const dateStr in dailyAggregates) {
+            const nicknamesForDay = dailyAggregates[dateStr];
+            for (const nickname in nicknamesForDay) {
+                const totalQuantity = nicknamesForDay[nickname];
+
+                if (totalQuantity > 0) {
+                    aggregatedEvents.push({
+                        id: `${dateStr}-${nickname}`, // 고유 ID 생성
+                        title: `${nickname} (${totalQuantity}개)`,
+                        start: dateStr, // 날짜 문자열을 그대로 사용
+                        allDay: true,
+                        extendedProps: {
+                            quantity: totalQuantity 
+                        }
+                    });
+                }
+            }
+        }
+        
+        return aggregatedEvents;
     }, [campaigns, sellers]);
   
-    // 달력의 각 날짜 셀 내용 렌더링
+    // 달력의 각 날짜 셀 내용 렌더링 (잔여 수량 표시)
     const renderSellerDayCell = (dayCellInfo) => {
         const dateStr = formatDate(dayCellInfo.date);
         const capacity = capacities[dateStr] || 0;
         
-        // ✅ [수정된 부분]
-        // dayCellInfo.events 대신, 전체 events 상태에서 직접 해당 날짜의 이벤트를 필터링합니다.
-        // 이것이 가장 확실하고 정확한 방법입니다.
+        // 해당 날짜의 모든 이벤트(예약)를 필터링
         const dailyEvents = events.filter(event => 
             formatDate(new Date(event.start)) === dateStr
         );
         
+        // 해당 날짜의 총 예약 수량 계산
         const totalQuantity = dailyEvents.reduce((sum, event) => {
-            // quantity가 문자열일 수 있으므로 숫자로 변환
             const quantity = Number(event.extendedProps?.quantity || 0);
             return sum + quantity;
         }, 0);
         
         const remaining = capacity - totalQuantity;
         const remainingColor = remaining > 0 ? 'text-blue-600' : 'text-red-500';
-        const remainingTextSize = remaining > 0 ? 'text-2xl' : 'text-lg';
+        const remainingTextSize = 'text-2xl'; // 크기 통일
 
         return (
             <>
                 <div className="absolute top-1 right-1 text-sm text-gray-600">{dayCellInfo.dayNumberText}</div>
                 <div className="flex flex-col items-center justify-center h-full pt-2">
                     <div className="text-xs text-gray-500">잔여</div>
-                    {remaining > 0 ? (
+                    {remaining > 0 && capacity > 0 ? ( // 잔여가 있고, 원래 capacity가 설정된 날만 링크 활성화
                         <Link href={`/dashboard/products?date=${dateStr}`} legacyBehavior>
                             <a className={`font-bold ${remainingTextSize} ${remainingColor} cursor-pointer hover:underline`}>
                                 {remaining}
@@ -129,7 +162,7 @@ function SellerHome() {
                     initialView="dayGridMonth"
                     headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
                     buttonText={{ today: 'today' }}
-                    events={events}
+                    events={events} // 그룹화된 이벤트 배열을 전달
                     dayCellContent={renderSellerDayCell}
                     dayCellClassNames="relative h-28" 
                     locale="ko"
