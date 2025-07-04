@@ -85,7 +85,7 @@ export default function DashboardPage() {
         
         // 항목별로 수수료를 계산하고 합산하여 총액과의 오차를 없앱니다.
         const currentTotalAmount = campaigns.reduce((sum, campaign) => {
-            return sum + Math.round(campaign.itemTotal * 1.04);
+            return sum + Math.round(campaign.itemTotal * 1.14);
         }, 0);
 
         setQuoteTotal(currentQuoteTotal);
@@ -305,7 +305,7 @@ export default function DashboardPage() {
                                 ) : (
                                     campaigns.map((c, index) => {
                                         // ✅ [추가] 항목별 최종 결제액 및 수수료 계산
-                                        const finalItemAmount = Math.round(c.itemTotal * 1.04);
+                                        const finalItemAmount = Math.round(c.itemTotal * 1.14);
                                         const commission = finalItemAmount - c.itemTotal;
 
                                         return (
@@ -343,7 +343,7 @@ export default function DashboardPage() {
                                 견적 합계: <span className="font-semibold">{quoteTotal.toLocaleString()}</span> 원
                             </p>
                              <p className="text-md">
-                                수수료 (4%): <span className="font-semibold">{totalCommission.toLocaleString()}</span> 원
+                                세금계산서 (10%) + 매입수수료 (4%): <span className="font-semibold">{totalCommission.toLocaleString()}</span> 원
                             </p>
                             <p className="text-lg font-bold">
                                 총 결제 금액: <span className="font-bold text-blue-600">{totalAmount.toLocaleString()}</span> 원
