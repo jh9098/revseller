@@ -98,7 +98,7 @@ export default function TrafficPage() {
                     <td className={`${tdClass} text-xs`}>
                       <div className="flex flex-col">
                         <span>시중가: {p.retailPrice.toLocaleString()}원</span>
-                        <span className="text-red-600">할인율: {p.discountRate * 100}%</span>
+                        <span className="text-red-600">할인율: {Math.round(p.discountRate * 100)}%</span>
                         <span className="font-bold text-blue-600 text-sm">판매가: {p.salePrice.toLocaleString()}원</span>
                       </div>
                     </td>
