@@ -43,10 +43,13 @@ export default function DashboardPage() {
     const [formState, setFormState] = useState(initialFormState);
     const [campaigns, setCampaigns] = useState([]);
     const [totalAmount, setTotalAmount] = useState(0);
-    const [savedCampaigns, setSavedCampaigns] = useState([]);
+  const [savedCampaigns, setSavedCampaigns] = useState([]);
     const [isLoadingDB, setIsLoadingDB] = useState(true);
     const [deposit, setDeposit] = useState(0);
     const [useDeposit, setUseDeposit] = useState(false);
+
+    const [quoteTotal, setQuoteTotal] = useState(0); // 수수료 미포함 견적 합계
+    
     
     // ✅ [추가] 단가표 모달의 열림/닫힘 상태를 관리합니다.
     const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
@@ -57,6 +60,7 @@ export default function DashboardPage() {
     const finalUnitPrice = basePrice + sundayExtraCharge;
     const amountToUseFromDeposit = useDeposit ? Math.min(totalAmount, deposit) : 0;
     const remainingPayment = totalAmount - amountToUseFromDeposit;
+    const totalCommission = totalAmount - quoteTotal;
 
     // --- useEffect 훅 (기존 로직과 동일) ---
     useEffect(() => {
@@ -77,9 +81,15 @@ export default function DashboardPage() {
     }, [formState.deliveryType, formState.reviewType]);
 
     useEffect(() => {
-        const quoteTotal = campaigns.reduce((sum, campaign) => sum + campaign.itemTotal, 0);
-        const final = Math.round(quoteTotal * 1.14);
-        setTotalAmount(final);
+        const currentQuoteTotal = campaigns.reduce((sum, campaign) => sum + campaign.itemTotal, 0);
+        
+        // 항목별로 수수료를 계산하고 합산하여 총액과의 오차를 없앱니다.
+        const currentTotalAmount = campaigns.reduce((sum, campaign) => {
+            return sum + Math.round(campaign.itemTotal * 1.14);
+        }, 0);
+
+        setQuoteTotal(currentQuoteTotal);
+        setTotalAmount(currentTotalAmount);
     }, [campaigns]);
 
     useEffect(() => {
@@ -107,7 +117,6 @@ export default function DashboardPage() {
             unsubscribeSeller();
         };
     }, [user, loading, router]);
-
 
     // --- 핸들러 함수 (기존 로직과 동일) ---
     const handleFormChange = (e) => {
@@ -291,32 +300,72 @@ export default function DashboardPage() {
                             {/* 테이블 내용 (기존과 동일) */}
                             <thead className="bg-gray-100"><tr>{['순번', '진행일자', '리뷰 종류', '상품명', '상품가', '작업개수', '견적 상세', '총 견적', '작업'].map(h => <th key={h} className={thClass}>{h}</th>)}</tr></thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {campaigns.length === 0 ? (<tr><td colSpan="9" className="text-center py-10 text-gray-500">위에서 작업을 추가해주세요.</td></tr>) : (campaigns.map((c, index) => (
-                                    <tr key={c.id}>
-                                        <td className={tdClass}>{index + 1}</td>
-                                        <td className={tdClass}><span className={c.date.getDay() === 0 ? 'text-red-500 font-bold' : ''}>{c.date.toLocaleDateString()}</span></td>
-                                        <td className={tdClass}>{c.reviewType}</td><td className={tdClass}>{c.productName}</td><td className={tdClass}>{Number(c.productPrice).toLocaleString()}원</td><td className={tdClass}>{c.quantity}</td>
-                                        <td className={tdClass + " text-xs text-gray-500"}>(리뷰 {c.finalUnitPrice.toLocaleString()} + 상품가 {Number(c.productPrice).toLocaleString()}) * {c.quantity}개</td>
-                                        <td className={`${tdClass} font-bold`}>{c.itemTotal.toLocaleString()}원</td>
-                                        <td className={tdClass}><button onClick={() => handleDeleteCampaign(c.id)} className="text-red-600 hover:text-red-800 font-semibold">삭제</button></td>
-                                    </tr>)))}
+                            {campaigns.length === 0 ? (
+                                    <tr><td colSpan="9" className="text-center py-10 text-gray-500">위에서 작업을 추가해주세요.</td></tr>
+                                ) : (
+                                    campaigns.map((c, index) => {
+                                        // ✅ [추가] 항목별 최종 결제액 및 수수료 계산
+                                        const finalItemAmount = Math.round(c.itemTotal * 1.14);
+                                        const commission = finalItemAmount - c.itemTotal;
+
+                                        return (
+                                            <tr key={c.id}>
+                                                <td className={tdClass}>{index + 1}</td>
+                                                <td className={tdClass}><span className={c.date.getDay() === 0 ? 'text-red-500 font-bold' : ''}>{new Date(c.date).toLocaleDateString()}</span></td>
+                                                <td className={tdClass}>{c.deliveryType}/{c.reviewType}</td>
+                                                <td className={tdClass}>{c.productName}</td>
+                                                <td className={tdClass}>{Number(c.productPrice).toLocaleString()}원</td>
+                                                <td className={tdClass}>{c.quantity}</td>
+                                                {/* ✅ [수정] 견적 상세 표시 */}
+                                                <td className={tdClass + " text-xs text-gray-500"}>
+                                                    ((리뷰 {c.basePrice.toLocaleString()}
+                                                    {c.sundayExtraCharge > 0 ? ` + 공휴일 ${c.sundayExtraCharge.toLocaleString()}` : ''}
+                                                    ) + 상품가 {Number(c.productPrice).toLocaleString()}) * {c.quantity}개
+                                                </td>
+                                                {/* ✅ [수정] 총 견적 표시 */}
+                                                <td className={tdClass}>
+                                                    <div className='font-bold'>{finalItemAmount.toLocaleString()}원</div>
+                                                    <div className='text-xs text-gray-500'>(견적 {c.itemTotal.toLocaleString()} + 수수료 {commission.toLocaleString()})</div>
+                                                </td>
+                                                <td className={tdClass}><button onClick={() => handleDeleteCampaign(c.id)} className="text-red-600 hover:text-red-800 font-semibold">삭제</button></td>
+                                            </tr>
+                                        )
+                                    })
+                                )}
                             </tbody>
                         </table>
                     </div>
 
-                    {/* 최종 결제 금액 및 예치금 사용 UI */}
-                    <div className="mt-6 p-6 bg-gray-50 rounded-lg text-right">
-                        {/* 결제 내용 (기존과 동일) */}
-                        <div className="space-y-2 mb-4">
-                            <p className="text-gray-600 text-lg">총 결제 금액: <span className="font-semibold">{totalAmount.toLocaleString()}</span> 원</p>
-                            <div className="flex justify-end items-center">
-                                <label htmlFor="use-deposit" className="text-gray-600 text-lg mr-2">예치금 사용:</label>
+                    {/* ✅ [수정] 최종 결제 금액 및 예치금 사용 UI */}
+                    <div className="mt-6 pt-6 border-t border-gray-200 text-right">
+                        <div className="space-y-2 mb-4 text-gray-700">
+                             <p className="text-md">
+                                견적 합계: <span className="font-semibold">{quoteTotal.toLocaleString()}</span> 원
+                            </p>
+                             <p className="text-md">
+                                수수료 (14%): <span className="font-semibold">{totalCommission.toLocaleString()}</span> 원
+                            </p>
+                            <p className="text-lg font-bold">
+                                총 결제 금액: <span className="font-bold text-blue-600">{totalAmount.toLocaleString()}</span> 원
+                            </p>
+                            <hr className="my-3"/>
+                            <div className="flex justify-end items-center text-lg">
+                                <label htmlFor="use-deposit" className="mr-2">예치금 사용:</label>
                                 <input type="checkbox" id="use-deposit" checked={useDeposit} onChange={(e) => setUseDeposit(e.target.checked)} disabled={deposit === 0 || totalAmount === 0} className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"/>
-                                <span className={`ml-2 text-red-500 font-semibold text-lg ${!useDeposit && 'opacity-50'}`}>- {amountToUseFromDeposit.toLocaleString()} 원</span>
+                                <span className={`ml-2 text-red-500 font-semibold ${!useDeposit && 'opacity-50'}`}>- {amountToUseFromDeposit.toLocaleString()} 원</span>
                             </div>
-                            <hr className="my-2"/><p className="text-gray-800">최종 결제 금액:<span className="font-bold text-3xl text-blue-700 ml-4">{remainingPayment.toLocaleString()}</span> 원</p>
+                            <hr className="my-3"/>
+                            <p className="text-gray-800">
+                                최종 결제 금액:
+                                <span className="font-bold text-3xl text-green-600 ml-4">
+                                    {remainingPayment.toLocaleString()}
+                                </span> 원
+                            </p>
                         </div>
-                        <button onClick={handleProcessPayment} disabled={campaigns.length === 0} className="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed">결제 진행</button>
+                        <button onClick={handleProcessPayment} disabled={campaigns.length === 0}
+                            className="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed">
+                            결제 진행
+                        </button>
                     </div>
                 </div>
                 
