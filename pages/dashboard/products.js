@@ -1,9 +1,7 @@
-// P:\revseller\pages\dashboard\products.js
-
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { db, auth } from '../../lib/firebase';
-import { collection, serverTimestamp, query, where, onSnapshot, writeBatch, doc, updateDoc, FieldValue, increment } from 'firebase/firestore'; // updateDoc, increment 추가
+import { collection, serverTimestamp, query, where, onSnapshot, writeBatch, doc, updateDoc, increment } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut } from 'firebase/auth';
 import SellerLayout from '../../components/seller/SellerLayout';
@@ -11,7 +9,7 @@ import { nanoid } from 'nanoid';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
-// --- getBasePrice, initialFormState는 기존과 동일 ---
+// --- 가격 계산 함수 (기존과 동일) ---
 const getBasePrice = (deliveryType, reviewType) => {
     if (deliveryType === '실배송') {
         switch (reviewType) {
@@ -30,11 +28,12 @@ const getBasePrice = (deliveryType, reviewType) => {
     }
     return 0;
 };
+
+// --- 초기 폼 상태 (기존과 동일) ---
 const initialFormState = {
     date: new Date(), deliveryType: '실배송', reviewType: '별점', quantity: 1, productName: '',
     productOption: '', productPrice: 0, productUrl: '', keywords: '', reviewGuide: '', remarks: ''
 };
-
 
 export default function DashboardPage() {
     const [user, loading] = useAuthState(auth);
@@ -42,25 +41,24 @@ export default function DashboardPage() {
 
     // --- 상태 관리 ---
     const [formState, setFormState] = useState(initialFormState);
-    const [campaigns, setCampaigns] = useState([]); // 로컬 견적 목록
-    const [totalAmount, setTotalAmount] = useState(0); // 수수료 포함 총 결제액
-    const [savedCampaigns, setSavedCampaigns] = useState([]); // DB 저장된 내역
+    const [campaigns, setCampaigns] = useState([]);
+    const [totalAmount, setTotalAmount] = useState(0);
+    const [savedCampaigns, setSavedCampaigns] = useState([]);
     const [isLoadingDB, setIsLoadingDB] = useState(true);
-
-    // ✅ [추가] 예치금 관련 상태
-    const [deposit, setDeposit] = useState(0); // 판매자 예치금
-    const [useDeposit, setUseDeposit] = useState(false); // 예치금 사용 여부
+    const [deposit, setDeposit] = useState(0);
+    const [useDeposit, setUseDeposit] = useState(false);
+    
+    // ✅ [추가] 단가표 모달의 열림/닫힘 상태를 관리합니다.
+    const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
 
     // --- 계산 로직 ---
     const basePrice = getBasePrice(formState.deliveryType, formState.reviewType);
     const sundayExtraCharge = formState.date.getDay() === 0 ? 600 : 0;
     const finalUnitPrice = basePrice + sundayExtraCharge;
-
-    // ✅ [추가] 예치금 사용에 따른 최종 결제액 계산
     const amountToUseFromDeposit = useDeposit ? Math.min(totalAmount, deposit) : 0;
     const remainingPayment = totalAmount - amountToUseFromDeposit;
 
-    // --- useEffect 훅 ---
+    // --- useEffect 훅 (기존 로직과 동일) ---
     useEffect(() => {
         if (router.isReady) {
             const { date } = router.query;
@@ -91,14 +89,12 @@ export default function DashboardPage() {
             return;
         }
         
-        // 내 캠페인 목록 불러오기
         const q = query(collection(db, "campaigns"), where("sellerUid", "==", user.uid));
         const unsubscribeCampaigns = onSnapshot(q, (snapshot) => {
             setSavedCampaigns(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setIsLoadingDB(false);
         });
 
-        // ✅ [추가] 판매자 정보(예치금 포함) 실시간으로 불러오기
         const sellerDocRef = doc(db, 'sellers', user.uid);
         const unsubscribeSeller = onSnapshot(sellerDocRef, (doc) => {
             if (doc.exists()) {
@@ -113,7 +109,7 @@ export default function DashboardPage() {
     }, [user, loading, router]);
 
 
-    // --- 핸들러 함수 ---
+    // --- 핸들러 함수 (기존 로직과 동일) ---
     const handleFormChange = (e) => {
         const { name, value } = e.target;
         setFormState(prev => ({ ...prev, [name]: value }));
@@ -136,7 +132,6 @@ export default function DashboardPage() {
         router.push('/');
     };
 
-    // ✅ [수정] 결제 처리 로직 (예치금 기능 통합)
     const handleProcessPayment = async () => {
         if (campaigns.length === 0 || !user) {
             alert('결제할 견적 항목이 없습니다.');
@@ -146,7 +141,6 @@ export default function DashboardPage() {
         const batch = writeBatch(db);
         const sellerDocRef = doc(db, 'sellers', user.uid);
 
-        // 1. 캠페인 정보 배치에 추가
         campaigns.forEach(campaign => {
             const { id, ...campaignData } = campaign;
             const campaignRef = doc(collection(db, 'campaigns'));
@@ -155,7 +149,6 @@ export default function DashboardPage() {
             });
         });
 
-        // 2. 예치금 사용 시, 예치금 차감 로직 배치에 추가
         if (useDeposit && amountToUseFromDeposit > 0) {
             batch.update(sellerDocRef, {
                 deposit: increment(-amountToUseFromDeposit)
@@ -165,13 +158,10 @@ export default function DashboardPage() {
         try {
             await batch.commit();
 
-            // 3. 결제 후 처리
             if (remainingPayment > 0) {
-                // PG 결제 필요
                 alert(`예치금 ${amountToUseFromDeposit.toLocaleString()}원이 사용되었습니다.\n차액 ${remainingPayment.toLocaleString()}원 결제를 진행합니다.`);
                 router.push(`/dashboard/payment?amount=${remainingPayment}`);
             } else {
-                // 예치금으로 전액 결제 완료
                 alert('예치금으로 결제가 완료되었습니다.');
                 setCampaigns([]);
                 setUseDeposit(false);
@@ -194,9 +184,9 @@ export default function DashboardPage() {
     return (
         <SellerLayout>
             <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
+                {/* 헤더 부분 */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
                     <h1 className="text-3xl font-bold text-gray-800">리뷰 캠페인 대시보드</h1>
-                    {/* ✅ [수정] 예치금 표시 UI */}
                     <div className="mt-4 sm:mt-0 flex items-center">
                         <span className="mr-4 text-gray-600">
                             <strong>예치금:</strong> <span className="font-bold text-blue-600">{deposit.toLocaleString()}원</span>
@@ -208,10 +198,11 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* --- 새 작업 추가 폼 (기존과 동일) --- */}
+                {/* 새 작업 추가 폼 */}
                 <form onSubmit={handleAddCampaign} className="p-6 bg-white rounded-xl shadow-lg mb-8">
                     <h2 className="text-2xl font-bold mb-6 text-gray-700">새 작업 추가</h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 items-end">
+                        {/* 폼 필드들 (기존과 동일) */}
                         <div>
                             <label className={labelClass}>진행 일자</label>
                             <DatePicker selected={formState.date} onChange={(date) => setFormState(p => ({ ...p, date }))} className={inputClass} />
@@ -271,8 +262,20 @@ export default function DashboardPage() {
                             </button>
                         </div>
                     </div>
-                    <div className="mt-6 p-4 border-t border-gray-200 flex justify-end items-center space-x-6">
-                        <div><span className="text-sm text-gray-500">기본 단가:</span><span className="ml-2 font-semibold">{basePrice.toLocaleString()}원</span></div>
+
+                    {/* ✅ [수정] 단가 표시 영역 */}
+                    <div className="mt-6 p-4 border-t border-gray-200 flex justify-end items-center space-x-6 flex-wrap">
+                        <div className="flex items-center">
+                            <span className="text-sm text-gray-500">{`${formState.deliveryType}/${formState.reviewType} 단가:`}</span>
+                            <span className="ml-2 font-semibold">{basePrice.toLocaleString()}원</span>
+                            <button 
+                                type="button" 
+                                onClick={() => setIsPriceModalOpen(true)}
+                                className="ml-4 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-1 px-2 rounded"
+                            >
+                                단가표 보기
+                            </button>
+                        </div>
                         <span className="text-gray-400">+</span>
                         <div><span className="text-sm text-gray-500">공휴일 가산금:</span><span className={`ml-2 font-semibold ${sundayExtraCharge > 0 ? 'text-red-500' : ''}`}>{sundayExtraCharge.toLocaleString()}원</span></div>
                         <span className="text-gray-400">=</span>
@@ -280,98 +283,120 @@ export default function DashboardPage() {
                     </div>
                 </form>
 
+                {/* 견적 목록 테이블 */}
                 <div className="p-6 bg-white rounded-xl shadow-lg">
                     <h2 className="text-2xl font-bold mb-4 text-gray-700">견적 목록 (스프레드시트)</h2>
-                    {/* --- 견적 목록 테이블 (기존과 동일) --- */}
                     <div className="overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-100">
-                                <tr>{['순번', '진행일자', '리뷰 종류', '상품명', '상품가', '작업개수', '견적 상세', '총 견적', '작업'].map(h => <th key={h} className={thClass}>{h}</th>)}</tr>
-                            </thead>
+                            {/* 테이블 내용 (기존과 동일) */}
+                            <thead className="bg-gray-100"><tr>{['순번', '진행일자', '리뷰 종류', '상품명', '상품가', '작업개수', '견적 상세', '총 견적', '작업'].map(h => <th key={h} className={thClass}>{h}</th>)}</tr></thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {campaigns.length === 0 ? (
-                                    <tr><td colSpan="9" className="text-center py-10 text-gray-500">위에서 작업을 추가해주세요.</td></tr>
-                                ) : (
-                                    campaigns.map((c, index) => (
-                                        <tr key={c.id}>
-                                            <td className={tdClass}>{index + 1}</td>
-                                            <td className={tdClass}><span className={c.date.getDay() === 0 ? 'text-red-500 font-bold' : ''}>{c.date.toLocaleDateString()}</span></td>
-                                            <td className={tdClass}>{c.reviewType}</td>
-                                            <td className={tdClass}>{c.productName}</td>
-                                            <td className={tdClass}>{Number(c.productPrice).toLocaleString()}원</td>
-                                            <td className={tdClass}>{c.quantity}</td>
-                                            <td className={tdClass + " text-xs text-gray-500"}>(리뷰 {c.finalUnitPrice.toLocaleString()} + 상품가 {Number(c.productPrice).toLocaleString()}) * {c.quantity}개</td>
-                                            <td className={`${tdClass} font-bold`}>{c.itemTotal.toLocaleString()}원</td>
-                                            <td className={tdClass}><button onClick={() => handleDeleteCampaign(c.id)} className="text-red-600 hover:text-red-800 font-semibold">삭제</button></td>
-                                        </tr>
-                                    ))
-                                )}
+                                {campaigns.length === 0 ? (<tr><td colSpan="9" className="text-center py-10 text-gray-500">위에서 작업을 추가해주세요.</td></tr>) : (campaigns.map((c, index) => (
+                                    <tr key={c.id}>
+                                        <td className={tdClass}>{index + 1}</td>
+                                        <td className={tdClass}><span className={c.date.getDay() === 0 ? 'text-red-500 font-bold' : ''}>{c.date.toLocaleDateString()}</span></td>
+                                        <td className={tdClass}>{c.reviewType}</td><td className={tdClass}>{c.productName}</td><td className={tdClass}>{Number(c.productPrice).toLocaleString()}원</td><td className={tdClass}>{c.quantity}</td>
+                                        <td className={tdClass + " text-xs text-gray-500"}>(리뷰 {c.finalUnitPrice.toLocaleString()} + 상품가 {Number(c.productPrice).toLocaleString()}) * {c.quantity}개</td>
+                                        <td className={`${tdClass} font-bold`}>{c.itemTotal.toLocaleString()}원</td>
+                                        <td className={tdClass}><button onClick={() => handleDeleteCampaign(c.id)} className="text-red-600 hover:text-red-800 font-semibold">삭제</button></td>
+                                    </tr>)))}
                             </tbody>
                         </table>
                     </div>
 
-                    {/* ✅ [수정] 최종 결제 금액 및 예치금 사용 UI */}
+                    {/* 최종 결제 금액 및 예치금 사용 UI */}
                     <div className="mt-6 p-6 bg-gray-50 rounded-lg text-right">
+                        {/* 결제 내용 (기존과 동일) */}
                         <div className="space-y-2 mb-4">
-                            <p className="text-gray-600 text-lg">
-                                총 결제 금액: <span className="font-semibold">{totalAmount.toLocaleString()}</span> 원
-                            </p>
+                            <p className="text-gray-600 text-lg">총 결제 금액: <span className="font-semibold">{totalAmount.toLocaleString()}</span> 원</p>
                             <div className="flex justify-end items-center">
                                 <label htmlFor="use-deposit" className="text-gray-600 text-lg mr-2">예치금 사용:</label>
-                                <input
-                                    type="checkbox"
-                                    id="use-deposit"
-                                    checked={useDeposit}
-                                    onChange={(e) => setUseDeposit(e.target.checked)}
-                                    disabled={deposit === 0 || totalAmount === 0}
-                                    className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"
-                                />
-                                <span className={`ml-2 text-red-500 font-semibold text-lg ${!useDeposit && 'opacity-50'}`}>
-                                    - {amountToUseFromDeposit.toLocaleString()} 원
-                                </span>
+                                <input type="checkbox" id="use-deposit" checked={useDeposit} onChange={(e) => setUseDeposit(e.target.checked)} disabled={deposit === 0 || totalAmount === 0} className="h-5 w-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50"/>
+                                <span className={`ml-2 text-red-500 font-semibold text-lg ${!useDeposit && 'opacity-50'}`}>- {amountToUseFromDeposit.toLocaleString()} 원</span>
                             </div>
-                            <hr className="my-2"/>
-                            <p className="text-gray-800">
-                                최종 결제 금액:
-                                <span className="font-bold text-3xl text-blue-700 ml-4">
-                                    {remainingPayment.toLocaleString()}
-                                </span> 원
-                            </p>
+                            <hr className="my-2"/><p className="text-gray-800">최종 결제 금액:<span className="font-bold text-3xl text-blue-700 ml-4">{remainingPayment.toLocaleString()}</span> 원</p>
                         </div>
-                        <button onClick={handleProcessPayment} disabled={campaigns.length === 0}
-                            className="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed">
-                            결제 진행
-                        </button>
+                        <button onClick={handleProcessPayment} disabled={campaigns.length === 0} className="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed">결제 진행</button>
                     </div>
                 </div>
                 
-                {/* --- 나의 예약 내역 테이블 (기존과 동일) --- */}
+                {/* 나의 예약 내역 테이블 */}
                 <div className="mt-8 p-6 bg-white rounded-xl shadow-lg">
                     <h2 className="text-2xl font-bold mb-4 text-gray-700">나의 예약 내역 (DB 저장 완료)</h2>
                     <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-100">
-                                <tr>{['진행일자', '상품명', '리뷰 종류', '총 견적', '결제상태'].map(h => <th key={h} className={thClass}>{h}</th>)}</tr>
-                            </thead>
+                         <table className="min-w-full divide-y divide-gray-200">
+                             {/* 테이블 내용 (기존과 동일) */}
+                            <thead className="bg-gray-100"><tr>{['진행일자', '상품명', '리뷰 종류', '총 견적', '결제상태'].map(h => <th key={h} className={thClass}>{h}</th>)}</tr></thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {savedCampaigns.length === 0 ? (
-                                    <tr><td colSpan="5" className="text-center py-10 text-gray-500">예약 내역이 없습니다.</td></tr>
-                                ) : (
-                                    savedCampaigns.map(c => (
-                                        <tr key={c.id}>
-                                            <td className={tdClass}>{c.date?.seconds ? new Date(c.date.seconds * 1000).toLocaleDateString() : '-'}</td>
-                                            <td className={tdClass}>{c.productName}</td>
-                                            <td className={tdClass}>{c.reviewType}</td>
-                                            <td className={tdClass}>{c.itemTotal?.toLocaleString()}원</td>
-                                            <td className={tdClass}><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${c.status === '예약 확정' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{c.status}</span></td>
-                                        </tr>
-                                    ))
-                                )}
+                                {savedCampaigns.length === 0 ? (<tr><td colSpan="5" className="text-center py-10 text-gray-500">예약 내역이 없습니다.</td></tr>) : (savedCampaigns.map(c => (
+                                    <tr key={c.id}>
+                                        <td className={tdClass}>{c.date?.seconds ? new Date(c.date.seconds * 1000).toLocaleDateString() : '-'}</td><td className={tdClass}>{c.productName}</td>
+                                        <td className={tdClass}>{c.reviewType}</td><td className={tdClass}>{c.itemTotal?.toLocaleString()}원</td>
+                                        <td className={tdClass}><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${c.status === '예약 확정' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{c.status}</span></td>
+                                    </tr>)))}
                             </tbody>
                         </table>
                     </div>
                 </div>
             </div>
+
+            {/* ✅ [추가] 단가표 모달 */}
+            {isPriceModalOpen && (
+                <div 
+                    className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50"
+                    onClick={() => setIsPriceModalOpen(false)} // 배경 클릭 시 닫기
+                >
+                    <div 
+                        className="bg-white p-8 rounded-lg shadow-xl w-full max-w-md animate-fade-in-up"
+                        onClick={(e) => e.stopPropagation()} // 모달 내부 클릭 시 닫히지 않도록
+                    >
+                        <h3 className="text-2xl font-bold mb-6 text-gray-800 text-center">리뷰 캠페인 단가표</h3>
+                        
+                        <div className="mb-6">
+                            <h4 className="text-lg font-semibold mb-2 text-gray-700">📦 실배송</h4>
+                            <table className="w-full text-sm text-left border-collapse">
+                                <thead>
+                                    <tr className="bg-gray-100">
+                                        <th className="p-2 border">리뷰 종류</th>
+                                        <th className="p-2 border text-right">단가</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td className="p-2 border">별점</td><td className="p-2 border text-right">1,600원</td></tr>
+                                    <tr><td className="p-2 border">텍스트</td><td className="p-2 border text-right">1,700원</td></tr>
+                                    <tr><td className="p-2 border">포토</td><td className="p-2 border text-right">1,800원</td></tr>
+                                    <tr><td className="p-2 border">프리미엄(포토)</td><td className="p-2 border text-right">4,000원</td></tr>
+                                    <tr><td className="p-2 border">프리미엄(영상)</td><td className="p-2 border text-right">5,000원</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div>
+                            <h4 className="text-lg font-semibold mb-2 text-gray-700">👻 빈박스</h4>
+                            <table className="w-full text-sm text-left border-collapse">
+                                 <thead>
+                                    <tr className="bg-gray-100">
+                                        <th className="p-2 border">리뷰 종류</th>
+                                        <th className="p-2 border text-right">단가</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td className="p-2 border">별점</td><td className="p-2 border text-right">5,400원</td></tr>
+                                    <tr><td className="p-2 border">텍스트</td><td className="p-2 border text-right">5,400원</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <p className="text-xs text-gray-500 mt-4">* 일요일/공휴일 진행 시 <strong className="text-red-500">600원</strong>의 가산금이 추가됩니다.</p>
+                        
+                        <div className="mt-8 text-center">
+                            <button onClick={() => setIsPriceModalOpen(false)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg">
+                                닫기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </SellerLayout>
     );
 }
