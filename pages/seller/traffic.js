@@ -6,12 +6,12 @@ import { ko } from 'date-fns/locale';
 
 // --- 데이터 정의: 트래픽 상품 목록 (카테고리 순으로 정렬) ---
 const initialTrafficProducts = [
-  { category: '베이직 트래픽', name: '피에스타', description: '', retailPrice: 60000, discountRate: 0.44 },
-  { category: '베이직 트래픽', name: '시그니처', description: '', retailPrice: 50000, discountRate: 0.36 },
-  { category: '애드온 트래픽', name: 'CP', description: '', retailPrice: 60000, discountRate: 0.42 },
-  { category: '애드온 트래픽', name: '솔트', description: '', retailPrice: 70000, discountRate: 0.40 },
-  { category: '애드온 트래픽', name: 'BBS', description: '', retailPrice: 80000, discountRate: 0.56 },
-  { category: '애드온 트래픽', name: '팡팡', description: '', retailPrice: 60000, discountRate: 0.34 },
+  { category: '베이직 트래픽', name: '피에스타', description: '', retailPrice: 60000, discountRate: 1-33900/60000 },
+  { category: '베이직 트래픽', name: '시그니처', description: '', retailPrice: 50000, discountRate: 1-31900/50000 },
+  { category: '애드온 트래픽', name: 'CP', description: '', retailPrice: 60000, discountRate: 1-34900/60000 },
+  { category: '애드온 트래픽', name: '솔트', description: '', retailPrice: 70000, discountRate: 1-41900/70000 },
+  { category: '애드온 트래픽', name: 'BBS', description: '', retailPrice: 80000, discountRate: 1-34900/80000 },
+  { category: '애드온 트래픽', name: '팡팡', description: '', retailPrice: 60000, discountRate: 1-39900/60000 },
 ];
 
 export default function TrafficPage() {
