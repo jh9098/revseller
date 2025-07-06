@@ -119,12 +119,10 @@ function SellerHome() {
         const dateStr = formatDate(dayCellInfo.date);
         const capacity = capacities[dateStr] || 0;
         
-        // 해당 날짜의 모든 이벤트(예약)를 필터링
         const dailyEvents = events.filter(event => 
             formatDate(new Date(event.start)) === dateStr
         );
         
-        // 해당 날짜의 총 예약 수량 계산
         const totalQuantity = dailyEvents.reduce((sum, event) => {
             const quantity = Number(event.extendedProps?.quantity || 0);
             return sum + quantity;
@@ -132,15 +130,22 @@ function SellerHome() {
         
         const remaining = capacity - totalQuantity;
         const remainingColor = remaining > 0 ? 'text-blue-600' : 'text-red-500';
-        const remainingTextSize = 'text-2xl'; // 크기 통일
+        // 폰트 크기를 약간 조절하여 레이아웃이 깨지지 않도록 합니다.
+        const remainingTextSize = 'text-xl'; 
 
         return (
-            <>
-                <div className="absolute top-1 right-1 text-sm text-gray-600">{dayCellInfo.dayNumberText}</div>
-                <div className="flex flex-col items-center justify-center h-full pt-2">
+            // 전체 셀을 Flexbox 컨테이너로 만듭니다. (세로 정렬)
+            <div className="flex flex-col h-full">
+                {/* 1. 날짜: 오른쪽 상단에 배치 */}
+                <div className="text-right text-sm text-gray-500 pr-1 pt-1">
+                    {dayCellInfo.dayNumberText}일
+                </div>
+
+                {/* 2. 잔여 수량: 남은 공간을 차지하며 중앙에 정렬 (flex-grow) */}
+                <div className="flex flex-col items-center justify-center flex-grow pb-2">
                     <div className="text-xs text-gray-500">잔여</div>
-                    {remaining > 0 && capacity > 0 ? ( // 잔여가 있고, 원래 capacity가 설정된 날만 링크 활성화
-                        <Link href={`/dashboard/products?date=${dateStr}`} legacyBehavior>
+                    {remaining > 0 && capacity > 0 ? (
+                        <Link href={`/seller/reservations?date=${dateStr}`} legacyBehavior>
                             <a className={`font-bold ${remainingTextSize} ${remainingColor} cursor-pointer hover:underline`}>
                                 {remaining}
                             </a>
@@ -149,7 +154,7 @@ function SellerHome() {
                         <span className={`font-bold ${remainingTextSize} ${remainingColor}`}>{remaining}</span>
                     )}
                 </div>
-            </>
+            </div>
         );
     };
 
@@ -162,8 +167,8 @@ function SellerHome() {
                     initialView="dayGridMonth"
                     headerToolbar={{ left: 'prev,next today', center: 'title', right: '' }}
                     buttonText={{ today: 'today' }}
-                    events={events} // 그룹화된 이벤트 배열을 전달
-                    dayCellContent={renderSellerDayCell}
+                    events={events}
+                    dayCellContent={renderSellerDayCell} // 수정된 렌더링 함수를 연결
                     dayCellClassNames="relative h-28" 
                     locale="ko"
                     height="auto"
