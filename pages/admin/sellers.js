@@ -1,55 +1,27 @@
 import { useState, useEffect } from 'react';
-import { db, auth } from '../../lib/firebase'; // auth 임포트 추가
-import { collection, onSnapshot, doc, updateDoc, deleteDoc, query, where, getDocs, writeBatch } from 'firebase/firestore';
-import { deleteUser } from 'firebase/auth'; // 직접적인 auth 제어는 클라이언트에서 불가능
+import { db } from '../../lib/firebase';
+import { collection, onSnapshot, doc, query, where, getDocs, writeBatch } from 'firebase/firestore';
 import AdminLayout from '../../components/admin/AdminLayout';
 import withAdminAuth from '../../hoc/withAdminAuth';
 
 function SellerManagement() {
   const [sellers, setSellers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [paymentAmounts, setPaymentAmounts] = useState({});
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, "sellers"), (querySnapshot) => {
       const sellersData = [];
-      const amountsData = {};
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         sellersData.push({ id: doc.id, ...data });
-        amountsData[doc.id] = data.paymentAmount || '';
       });
       setSellers(sellersData);
-      setPaymentAmounts(amountsData);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const handleAmountChange = (uid, value) => {
-    setPaymentAmounts(prev => ({ ...prev, [uid]: value }));
-  };
-
-  const handleSaveAmount = async (uid) => {
-    // ... 기존 코드와 동일 ...
-    const amountToSave = paymentAmounts[uid];
-    if (isNaN(amountToSave) || amountToSave === '') {
-      alert('유효한 숫자를 입력해주세요.');
-      return;
-    }
-
-    const sellerDocRef = doc(db, 'sellers', uid);
-    try {
-      await updateDoc(sellerDocRef, {
-        paymentAmount: Number(amountToSave)
-      });
-      alert('결제 금액이 성공적으로 저장되었습니다.');
-    } catch (error) {
-      console.error("금액 저장 오류:", error);
-      alert("금액 저장에 실패했습니다.");
-    }
-  };
 
   // ✅ 판매자 강제 탈퇴 함수 추가
   const handleDeleteSeller = async (seller) => {
@@ -100,33 +72,27 @@ function SellerManagement() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이름</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사업자번호</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">이메일</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">사업자 번호</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">결제 금액 설정</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">전화번호</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">닉네임</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">추천인ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">예치금</th>
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sellers.map((seller) => (
                 <tr key={seller.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">{seller.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{seller.name || '정보 없음'}</td>
                   <td className="px-6 py-4 whitespace-nowrap">{seller.businessInfo?.b_no || '정보 없음'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <input
-                      type="number"
-                      placeholder="금액 입력"
-                      value={paymentAmounts[seller.id] || ''}
-                      onChange={(e) => handleAmountChange(seller.id, e.target.value)}
-                      className="w-32 p-2 border rounded-md"
-                    /> 원
-                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">{seller.email}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{seller.phone || '정보 없음'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{seller.nickname || '정보 없음'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{seller.referrerId || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">{(seller.deposit ?? 0).toLocaleString()}원</td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <button
-                      onClick={() => handleSaveAmount(seller.id)}
-                      className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mr-2"
-                    >
-                      저장
-                    </button>
                     {/* ✅ 탈퇴 버튼 추가 */}
                     <button
                       onClick={() => handleDeleteSeller(seller)}
