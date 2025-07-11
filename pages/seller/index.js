@@ -60,17 +60,20 @@ function SellerHome() {
         };
     }, []);
 
-    // ✅ [핵심 수정 부분] campaigns 데이터를 그룹화하여 events 배열을 생성합니다.
+    // ✅ [핵심 수정 부분] 예약 확정된 캠페인만 캘린더에 표시합니다.
     const events = useMemo(() => {
         if (Object.keys(sellers).length === 0 || campaigns.length === 0) return [];
+
+        // '예약 확정' 상태의 캠페인만 선별합니다.
+        const confirmed = campaigns.filter(c => c.status === '예약 확정');
 
         // 1. 날짜와 닉네임별로 수량을 합산하기 위한 중간 데이터 구조
         // ex: { '2025-07-01': { '꿀꿀이': 1, '바르르': 211 }, ... }
         const dailyAggregates = {};
 
-        campaigns.forEach(campaign => {
-            const eventDate = campaign.date?.seconds 
-                ? new Date(campaign.date.seconds * 1000) 
+        confirmed.forEach(campaign => {
+            const eventDate = campaign.date?.seconds
+                ? new Date(campaign.date.seconds * 1000)
                 : new Date(campaign.date);
             
             const dateStr = formatDate(eventDate);
