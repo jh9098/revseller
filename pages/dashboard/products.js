@@ -279,7 +279,10 @@ const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
     const handleConfirmReservation = async () => {
         if (!confirmCampaign) return;
         try {
-            await updateDoc(doc(db, 'campaigns', confirmCampaign.id), { status: '예약 확정' });
+            await updateDoc(doc(db, 'campaigns', confirmCampaign.id), {
+                status: '예약 확정',
+                confirmedAt: serverTimestamp()
+            });
         } catch (err) {
             console.error('예약 확정 오류:', err);
         }
