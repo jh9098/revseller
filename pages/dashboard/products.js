@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { db, auth } from '../../lib/firebase';
-import { collection, serverTimestamp, query, where, onSnapshot, writeBatch, doc, increment } from 'firebase/firestore';
+import { collection, serverTimestamp, query, where, onSnapshot, writeBatch, doc, increment, updateDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut } from 'firebase/auth';
 import SellerLayout from '../../components/seller/SellerLayout';
@@ -72,6 +72,7 @@ export default function DashboardPage() {
     const [sellersMap, setSellersMap] = useState({});
     const [capacities, setCapacities] = useState({});
     const [showDepositPopup, setShowDepositPopup] = useState(false);
+    const [confirmCampaign, setConfirmCampaign] = useState(null);
 
     const [quoteTotal, setQuoteTotal] = useState(0); // 수수료 미포함 견적 합계
     
@@ -83,7 +84,7 @@ const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
     const calendarEvents = useMemo(() => {
         if (Object.keys(sellersMap).length === 0 || calendarCampaigns.length === 0) return [];
         const dailyAggregates = {};
-        calendarCampaigns.forEach(c => {
+        calendarCampaigns.filter(c => c.status === '예약 확정').forEach(c => {
             const d = c.date?.seconds ? new Date(c.date.seconds * 1000) : new Date(c.date);
             const dateStr = formatDate(d);
             if (!dateStr) return;
@@ -242,7 +243,11 @@ const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
             const { id, ...campaignData } = campaign;
             const campaignRef = doc(collection(db, 'campaigns'));
             batch.set(campaignRef, {
-                ...campaignData, sellerUid: user.uid, createdAt: serverTimestamp(), status: '미확정'
+                ...campaignData,
+                sellerUid: user.uid,
+                createdAt: serverTimestamp(),
+                status: '미확정',
+                paymentReceived: false
             });
         });
 
@@ -261,6 +266,24 @@ const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
             console.error('결제 처리 중 오류 발생:', error);
             alert('결제 처리 중 오류가 발생했습니다.');
         }
+    };
+
+    const handleDepositChange = async (id, checked) => {
+        try {
+            await updateDoc(doc(db, 'campaigns', id), { paymentReceived: checked });
+        } catch (err) {
+            console.error('입금 여부 업데이트 오류:', err);
+        }
+    };
+
+    const handleConfirmReservation = async () => {
+        if (!confirmCampaign) return;
+        try {
+            await updateDoc(doc(db, 'campaigns', confirmCampaign.id), { status: '예약 확정' });
+        } catch (err) {
+            console.error('예약 확정 오류:', err);
+        }
+        setConfirmCampaign(null);
     };
     
     // --- 렌더링 ---
@@ -468,16 +491,49 @@ const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
                 <div className="mt-8 p-6 bg-white rounded-xl shadow-lg">
                     <h2 className="text-2xl font-bold mb-4 text-gray-700">나의 예약 내역 (DB 저장 완료)</h2>
                     <div className="overflow-x-auto">
-                         <table className="min-w-full divide-y divide-gray-200">
-                             {/* 테이블 내용 (기존과 동일) */}
-                            <thead className="bg-gray-100"><tr>{['진행일자', '상품명', '리뷰 종류', '총 견적', '결제상태'].map(h => <th key={h} className={thClass}>{h}</th>)}</tr></thead>
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-100">
+                                <tr>
+                                    <th className={thClass}>진행일자</th>
+                                    <th className={thClass} title="입금을 완료하셨으면 체크박스를 클릭해 주세요">입금여부*</th>
+                                    <th className={thClass}>결제상태</th>
+                                    <th className={thClass}>진행상태</th>
+                                    <th className={thClass}>상품명</th>
+                                    <th className={thClass}>리뷰 종류</th>
+                                    <th className={thClass}>총 견적</th>
+                                </tr>
+                            </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                                {savedCampaigns.length === 0 ? (<tr><td colSpan="5" className="text-center py-10 text-gray-500">예약 내역이 없습니다.</td></tr>) : (savedCampaigns.map(c => (
-                                    <tr key={c.id}>
-                                        <td className={tdClass}>{c.date?.seconds ? formatDateWithDay(new Date(c.date.seconds * 1000)) : '-'}</td><td className={tdClass}>{c.productName}</td>
-                                        <td className={tdClass}>{c.reviewType}</td><td className={tdClass}>{c.itemTotal?.toLocaleString()}원</td>
-                                        <td className={tdClass}><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${c.status === '예약 확정' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{c.status}</span></td>
-                                    </tr>)))}
+                                {savedCampaigns.length === 0 ? (
+                                    <tr><td colSpan="7" className="text-center py-10 text-gray-500">예약 내역이 없습니다.</td></tr>
+                                ) : (
+                                    savedCampaigns.map(c => (
+                                        <tr key={c.id}>
+                                            <td className={tdClass}>{c.date?.seconds ? formatDateWithDay(new Date(c.date.seconds * 1000)) : '-'}</td>
+                                            <td className={tdClass}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={!!c.paymentReceived}
+                                                    onChange={(e) => handleDepositChange(c.id, e.target.checked)}
+                                                    title="입금을 완료하셨으면 체크박스를 클릭해 주세요"
+                                                />
+                                            </td>
+                                            <td className={tdClass}>{c.paymentReceived ? '입금완료' : '입금전'}</td>
+                                            <td className={tdClass}>
+                                                {c.paymentReceived ? (
+                                                    c.status === '예약 확정' ? (
+                                                        <span>예약확정</span>
+                                                    ) : (
+                                                        <button onClick={() => setConfirmCampaign(c)} className="text-blue-600 underline">예약확정</button>
+                                                    )
+                                                ) : '예약중'}
+                                            </td>
+                                            <td className={tdClass}>{c.productName}</td>
+                                            <td className={tdClass}>{c.reviewType}</td>
+                                            <td className={tdClass}>{c.itemTotal?.toLocaleString()}원</td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -537,6 +593,18 @@ const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
                             <button onClick={() => setIsPriceModalOpen(false)} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-lg">
                                 닫기
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {confirmCampaign && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setConfirmCampaign(null)}>
+                    <div className="bg-white p-6 rounded shadow" onClick={(e) => e.stopPropagation()}>
+                        <p className="mb-4">예약확정하겠습니까?</p>
+                        <div className="flex justify-center space-x-4">
+                            <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={handleConfirmReservation}>예</button>
+                            <button className="px-4 py-2 bg-gray-300 rounded" onClick={() => setConfirmCampaign(null)}>아니오</button>
                         </div>
                     </div>
                 </div>
