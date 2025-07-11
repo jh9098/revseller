@@ -58,6 +58,12 @@ export default function ProgressPage() {
 
   const months = [1,2,3,4,5,6,7,8,9,10,11,12];
 
+  // 캠페인 수량만큼 행을 확장합니다.
+  const expandedCampaigns = filteredCampaigns.flatMap(c => {
+    const qty = Number(c.quantity) || 1;
+    return Array.from({ length: qty }, () => c);
+  });
+
   return (
     <SellerLayout>
       <div className="flex items-center mb-4 space-x-2">
@@ -78,10 +84,10 @@ export default function ProgressPage() {
           </tr>
         </thead>
         <tbody className="divide-y">
-          {filteredCampaigns.map((c, idx) => {
+          {expandedCampaigns.map((c, idx) => {
             const d = c.date?.seconds ? new Date(c.date.seconds * 1000) : new Date(c.date);
             return (
-              <tr key={c.id} className="text-sm">
+              <tr key={`${c.id}-${idx}`} className="text-sm">
                 <td className="px-2 py-2">{idx + 1}</td>
                 <td className="px-2 py-2">{d.toLocaleDateString()}</td>
                 <td className="px-2 py-2">{c.deliveryType}</td>
