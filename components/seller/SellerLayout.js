@@ -3,12 +3,16 @@ import { useState } from 'react';
 
 export default function SellerLayout({ children }) {
   const [open, setOpen] = useState({ experience: false, traffic: false, kita: false });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const toggle = (key) => setOpen(prev => ({ ...prev, [key]: !prev[key] }));
 
   return (
     <div className="flex">
-      <aside className="w-64 bg-gray-800 text-white min-h-screen p-4">
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-20 w-64 bg-gray-800 text-white min-h-screen p-4 transform transition-transform md:relative md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:block`}
+      >
         <h1 className="text-2xl font-bold mb-8">판매자 페이지</h1>
         <nav>
           <ul>
@@ -79,9 +83,15 @@ export default function SellerLayout({ children }) {
           </ul>
         </nav>
       </aside>
-      <main className="flex-1 p-8 bg-gray-100">
-        {children}
-      </main>
+      <div className="flex flex-col flex-1 md:ml-64">
+        <button
+          className="p-2 m-2 text-gray-700 bg-gray-200 rounded md:hidden w-10"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+        >
+          ☰
+        </button>
+        <main className="flex-1 p-8 bg-gray-100">{children}</main>
+      </div>
     </div>
   );
 }
