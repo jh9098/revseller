@@ -38,9 +38,9 @@ export default function LoginPage() {
       if (snap.empty) throw new Error('존재하지 않는 ID입니다.');
       const { email } = snap.docs[0].data();
       await signInWithEmailAndPassword(auth, email, loginPassword);
-      router.push('/dashboard/products');
+      router.push('/seller');
     } catch (error) {
-      alert(`로그인 실패: ${error.message}`);
+      alert('아이디/비밀번호를 다시 입력해 주세요.');
     }
   };
 
@@ -100,7 +100,7 @@ export default function LoginPage() {
         });
         
         alert(`${data.tax_type} 사업자 인증 및 가입이 완료되었습니다. 바로 로그인됩니다.`);
-        router.push('/dashboard/products');
+        router.push('/seller');
 
       } else {
         alert(`인증 실패: ${data.b_stt || data.message || '알 수 없는 오류'}`);
@@ -120,7 +120,7 @@ export default function LoginPage() {
       {user ? (
         <div style={{ border: '1px solid #ccc', padding: '20px', marginBottom: '20px', textAlign: 'center' }}>
           <p>{user.email}님, 환영합니다.</p>
-          <button onClick={() => router.push('/dashboard/products')} style={{ width: '100%', padding: '10px', marginTop: '10px' }}>대시보드로 이동</button>
+          <button onClick={() => router.push('/seller')} style={{ width: '100%', padding: '10px', marginTop: '10px' }}>대시보드로 이동</button>
           <button onClick={handleLogout} style={{ width: '100%', padding: '10px', marginTop: '10px', backgroundColor: 'grey', color: 'white' }}>로그아웃</button>
         </div>
       ) : (

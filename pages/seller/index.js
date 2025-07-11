@@ -145,7 +145,7 @@ function SellerHome() {
                 <div className="flex flex-col items-center justify-center flex-grow pb-2">
                     <div className="text-xs text-gray-500">잔여</div>
                     {remaining > 0 && capacity > 0 ? (
-                        <Link href={`/seller/reservations?date=${dateStr}`} legacyBehavior>
+                        <Link href={`/dashboard/products?date=${dateStr}`} legacyBehavior>
                             <a className={`font-bold ${remainingTextSize} ${remainingColor} cursor-pointer hover:underline`}>
                                 {remaining}
                             </a>
