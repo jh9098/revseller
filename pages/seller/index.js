@@ -163,7 +163,7 @@ function SellerHome() {
 
     return (
         <SellerLayout>
-            <h2 className="text-2xl font-bold mb-4">체험단 예약 현황 (날짜 클릭 시 예약 가능)</h2>
+            <h2 className="text-2xl font-bold mb-4">체험단 예약 현황 (잔여 수량 클릭 시 예약 가능)</h2>
             <div className="bg-white p-4 rounded-lg shadow-md">
                 <FullCalendar
                     plugins={[dayGridPlugin, interactionPlugin]}
