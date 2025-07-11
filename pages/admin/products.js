@@ -9,6 +9,8 @@ import Papa from 'papaparse';
 function CampaignManagement() {
   const [campaigns, setCampaigns] =  useState([]);
   const [loading, setLoading] = useState(true);
+  const [sellersMap, setSellersMap] = useState({});
+  const [selectedCampaign, setSelectedCampaign] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -24,6 +26,18 @@ function CampaignManagement() {
     });
 
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'sellers'), (snap) => {
+      const map = {};
+      snap.forEach(d => {
+        const data = d.data();
+        if (data.uid) map[data.uid] = data.nickname || '닉네임 없음';
+      });
+      setSellersMap(map);
+    });
+    return () => unsub();
   }, []);
 
   // 일반 상태 업데이트 함수
@@ -170,15 +184,24 @@ function CampaignManagement() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {['진행일자', '판매자', '상품명', '리뷰종류', '개수', '견적', '결제상태', '상태변경'].map(h => <th key={h} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>)}
+                {['진행일자', '닉네임', '상품명', '구분', '리뷰종류', '개수', '견적', '결제상태', '상태변경'].map(h => (
+                  <th key={h} className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
                 {campaigns.map((c) => (
                   <tr key={c.id}>
                     <td className="px-3 py-4 whitespace-nowrap text-sm">{c.date?.seconds ? new Date(c.date.seconds * 1000).toLocaleDateString() : '날짜 없음'}</td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500" title={c.sellerUid}>{c.sellerUid ? c.sellerUid.substring(0, 8) + '...' : '판매자 없음'}</td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm font-semibold">{c.productName || '상품명 없음'}</td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-500" title={c.sellerUid}>{sellersMap[c.sellerUid] || '닉네임 없음'}</td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm font-semibold">
+                      <button className="text-blue-600 underline" onClick={() => setSelectedCampaign(c)}>
+                        {c.productName || '상품명 없음'}
+                      </button>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">{c.deliveryType || '-'}</td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm">{c.reviewType || '-'}</td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm">{c.quantity || '-'}</td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm">{typeof c.itemTotal === 'number' ? c.itemTotal.toLocaleString() + '원' : '견적 없음'}</td>
@@ -213,6 +236,40 @@ function CampaignManagement() {
           </table>
         )}
       </div>
+      {selectedCampaign && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setSelectedCampaign(null)}
+        >
+          <div
+            className="bg-white p-6 rounded-lg shadow max-w-lg w-full overflow-y-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold mb-4">상세 정보</h3>
+            <table className="w-full text-sm">
+              <tbody>
+                <tr><td className="font-semibold pr-2">닉네임</td><td>{sellersMap[selectedCampaign.sellerUid] || '닉네임 없음'}</td></tr>
+                <tr><td className="font-semibold pr-2">진행일자</td><td>{selectedCampaign.date?.seconds ? new Date(selectedCampaign.date.seconds * 1000).toLocaleDateString() : '-'}</td></tr>
+                <tr><td className="font-semibold pr-2">구분</td><td>{selectedCampaign.deliveryType}</td></tr>
+                <tr><td className="font-semibold pr-2">리뷰종류</td><td>{selectedCampaign.reviewType}</td></tr>
+                <tr><td className="font-semibold pr-2">체험단 개수</td><td>{selectedCampaign.quantity}</td></tr>
+                <tr><td className="font-semibold pr-2">상품명</td><td>{selectedCampaign.productName}</td></tr>
+                <tr><td className="font-semibold pr-2">옵션</td><td>{selectedCampaign.productOption}</td></tr>
+                <tr><td className="font-semibold pr-2">상품가</td><td>{selectedCampaign.productPrice}</td></tr>
+                <tr><td className="font-semibold pr-2">상품URL</td><td><a href={selectedCampaign.productUrl} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{selectedCampaign.productUrl}</a></td></tr>
+                <tr><td className="font-semibold pr-2">키워드</td><td>{selectedCampaign.keywords}</td></tr>
+                <tr><td className="font-semibold pr-2">리뷰가이드</td><td>{selectedCampaign.reviewGuide}</td></tr>
+                <tr><td className="font-semibold pr-2">비고</td><td>{selectedCampaign.remarks}</td></tr>
+                <tr><td className="font-semibold pr-2">체험단견적</td><td>{selectedCampaign.itemTotal?.toLocaleString()}원</td></tr>
+                <tr><td className="font-semibold pr-2">결제상태</td><td>{selectedCampaign.status}</td></tr>
+              </tbody>
+            </table>
+            <div className="text-center mt-4">
+              <button onClick={() => setSelectedCampaign(null)} className="px-4 py-2 bg-gray-700 text-white rounded">닫기</button>
+            </div>
+          </div>
+        </div>
+      )}
     </AdminLayout>
   );
 }
