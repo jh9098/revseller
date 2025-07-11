@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import { db, auth } from '../../lib/firebase';
-import { collection, serverTimestamp, query, where, onSnapshot, writeBatch, doc, updateDoc, increment } from 'firebase/firestore';
+import { collection, serverTimestamp, query, where, onSnapshot, writeBatch, doc, increment } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { signOut } from 'firebase/auth';
 import SellerLayout from '../../components/seller/SellerLayout';
 import { nanoid } from 'nanoid';
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import interactionPlugin from "@fullcalendar/interaction";
 
 // --- 가격 계산 함수 (기존과 동일) ---
 const getBasePrice = (deliveryType, reviewType) => {
@@ -35,6 +38,22 @@ const initialFormState = {
     productOption: '', productPrice: 0, productUrl: '', keywords: '', reviewGuide: '', remarks: ''
 };
 
+// 날짜를 YYYY-MM-DD 형식으로 변환
+const formatDate = (date) => {
+    if (!date || !(date instanceof Date)) return '';
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+};
+
+// YYYY-MM-DD(요일) 형식으로 변환
+const formatDateWithDay = (date) => {
+    if (!date || !(date instanceof Date)) return '';
+    const days = ['일', '월', '화', '수', '목', '금', '토'];
+    return `${formatDate(date)}(${days[date.getDay()]})`;
+};
+
 export default function DashboardPage() {
     const [user, loading] = useAuthState(auth);
     const router = useRouter();
@@ -48,11 +67,61 @@ export default function DashboardPage() {
     const [deposit, setDeposit] = useState(0);
     const [useDeposit, setUseDeposit] = useState(false);
 
+    const [nickname, setNickname] = useState('');
+    const [calendarCampaigns, setCalendarCampaigns] = useState([]);
+    const [sellersMap, setSellersMap] = useState({});
+    const [capacities, setCapacities] = useState({});
+    const [showDepositPopup, setShowDepositPopup] = useState(false);
+
     const [quoteTotal, setQuoteTotal] = useState(0); // 수수료 미포함 견적 합계
     
     
     // ✅ [추가] 단가표 모달의 열림/닫힘 상태를 관리합니다.
-    const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
+const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
+
+    // 예약 현황 캘린더용 이벤트 생성
+    const calendarEvents = useMemo(() => {
+        if (Object.keys(sellersMap).length === 0 || calendarCampaigns.length === 0) return [];
+        const dailyAggregates = {};
+        calendarCampaigns.forEach(c => {
+            const d = c.date?.seconds ? new Date(c.date.seconds * 1000) : new Date(c.date);
+            const dateStr = formatDate(d);
+            if (!dateStr) return;
+            const nickname = sellersMap[c.sellerUid] || '판매자';
+            const qty = Number(c.quantity) || 0;
+            if (!dailyAggregates[dateStr]) dailyAggregates[dateStr] = {};
+            if (!dailyAggregates[dateStr][nickname]) dailyAggregates[dateStr][nickname] = 0;
+            dailyAggregates[dateStr][nickname] += qty;
+        });
+
+        const events = [];
+        for (const dateStr in dailyAggregates) {
+            const nickMap = dailyAggregates[dateStr];
+            for (const nick in nickMap) {
+                const qty = nickMap[nick];
+                events.push({ id: `${dateStr}-${nick}`, title: `${nick} (${qty}개)`, start: dateStr, allDay: true, extendedProps: { quantity: qty } });
+            }
+        }
+        return events;
+    }, [calendarCampaigns, sellersMap]);
+
+    const renderDayCell = (info) => {
+        const dateStr = formatDate(info.date);
+        const capacity = capacities[dateStr] || 0;
+        const dayEvents = calendarEvents.filter(e => formatDate(new Date(e.start)) === dateStr);
+        const totalQty = dayEvents.reduce((s,e)=>s+Number(e.extendedProps?.quantity||0),0);
+        const remaining = capacity - totalQty;
+        const color = remaining > 0 ? 'text-blue-600' : 'text-red-500';
+        return (
+            <div className="flex flex-col h-full">
+                <div className="text-right text-xs text-gray-500 pr-1 pt-1">{info.dayNumberText}일</div>
+                <div className="flex-grow flex flex-col items-center justify-center pb-1">
+                    <div className="text-[10px] text-gray-500">잔여</div>
+                    <span className={`text-xs font-bold ${color}`}>{remaining}</span>
+                </div>
+            </div>
+        );
+    };
 
     // --- 계산 로직 ---
     const basePrice = getBasePrice(formState.deliveryType, formState.reviewType);
@@ -85,7 +154,7 @@ export default function DashboardPage() {
         
         // 항목별로 수수료를 계산하고 합산하여 총액과의 오차를 없앱니다.
         const currentTotalAmount = campaigns.reduce((sum, campaign) => {
-            return sum + Math.round(campaign.itemTotal * 1.14);
+            return sum + Math.round(campaign.itemTotal * 1.10);
         }, 0);
 
         setQuoteTotal(currentQuoteTotal);
@@ -108,13 +177,32 @@ export default function DashboardPage() {
         const sellerDocRef = doc(db, 'sellers', user.uid);
         const unsubscribeSeller = onSnapshot(sellerDocRef, (doc) => {
             if (doc.exists()) {
-                setDeposit(doc.data().deposit || 0);
+                const data = doc.data();
+                setDeposit(data.deposit || 0);
+                setNickname(data.nickname || user.email);
             }
+        });
+
+        // 전체 예약 현황 데이터 가져오기
+        const unsubAllSellers = onSnapshot(collection(db, 'sellers'), (snap) => {
+            const map = {};
+            snap.forEach(d => { const data = d.data(); if (data.uid) map[data.uid] = data.nickname || '이름없음'; });
+            setSellersMap(map);
+        });
+        const unsubAllCampaigns = onSnapshot(collection(db, 'campaigns'), (snap) => {
+            setCalendarCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        const unsubCaps = onSnapshot(collection(db, 'capacities'), (snap) => {
+            const caps = {}; snap.forEach(d => { caps[d.id] = d.data().capacity || 0; });
+            setCapacities(caps);
         });
 
         return () => {
             unsubscribeCampaigns();
             unsubscribeSeller();
+            unsubAllSellers();
+            unsubAllCampaigns();
+            unsubCaps();
         };
     }, [user, loading, router]);
 
@@ -166,15 +254,9 @@ export default function DashboardPage() {
 
         try {
             await batch.commit();
-
-            if (remainingPayment > 0) {
-                alert(`예치금 ${amountToUseFromDeposit.toLocaleString()}원이 사용되었습니다.\n차액 ${remainingPayment.toLocaleString()}원 결제를 진행합니다.`);
-                router.push(`/dashboard/payment?amount=${remainingPayment}`);
-            } else {
-                alert('예치금으로 결제가 완료되었습니다.');
-                setCampaigns([]);
-                setUseDeposit(false);
-            }
+            setShowDepositPopup(true);
+            setCampaigns([]);
+            setUseDeposit(false);
         } catch (error) {
             console.error('결제 처리 중 오류 발생:', error);
             alert('결제 처리 중 오류가 발생했습니다.');
@@ -200,7 +282,7 @@ export default function DashboardPage() {
                         <span className="mr-4 text-gray-600">
                             <strong>예치금:</strong> <span className="font-bold text-blue-600">{deposit.toLocaleString()}원</span>
                         </span>
-                        <span className="mr-4 text-gray-600">{user?.email}</span>
+                        <span className="mr-4 text-gray-600">{nickname}</span>
                         <button onClick={handleLogout} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg">
                             로그아웃
                         </button>
@@ -210,65 +292,78 @@ export default function DashboardPage() {
                 {/* 새 작업 추가 폼 */}
                 <form onSubmit={handleAddCampaign} className="p-6 bg-white rounded-xl shadow-lg mb-8">
                     <h2 className="text-2xl font-bold mb-6 text-gray-700">새 작업 추가</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-6 items-end">
-                        {/* 폼 필드들 (기존과 동일) */}
+                    <div className="grid lg:grid-cols-3 gap-6">
                         <div>
                             <label className={labelClass}>진행 일자</label>
                             <DatePicker selected={formState.date} onChange={(date) => setFormState(p => ({ ...p, date }))} className={inputClass} />
+                            <div className="mt-4 text-xs">
+                                <FullCalendar
+                                    plugins={[dayGridPlugin, interactionPlugin]}
+                                    initialView="dayGridMonth"
+                                    headerToolbar={{ left: 'prev,next', center: 'title', right: '' }}
+                                    events={calendarEvents}
+                                    dayCellContent={renderDayCell}
+                                    dayCellClassNames="h-20"
+                                    locale="ko"
+                                    height={250}
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className={labelClass}>구분</label>
+                                    <select name="deliveryType" value={formState.deliveryType} onChange={handleFormChange} className={inputClass}>
+                                        <option value="실배송">실배송</option>
+                                        <option value="빈박스">빈박스</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>리뷰 종류</label>
+                                    <select name="reviewType" value={formState.reviewType} onChange={handleFormChange} className={inputClass}>
+                                        {formState.deliveryType === '실배송' ? (
+                                            <> <option>별점</option><option>텍스트</option><option>포토</option><option>프리미엄(포토)</option><option>프리미엄(영상)</option> </>
+                                        ) : (
+                                            <> <option>별점</option><option>텍스트</option> </>
+                                        )}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>체험단 개수</label>
+                                    <input type="number" name="quantity" value={formState.quantity} onChange={handleFormChange} className={inputClass} min="1" required />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className={labelClass}>상품명</label>
+                                    <input type="text" name="productName" value={formState.productName} onChange={handleFormChange} className={inputClass} required />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>상품가</label>
+                                    <input type="number" name="productPrice" value={formState.productPrice} onChange={handleFormChange} className={inputClass} placeholder="0" />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>옵션</label>
+                                    <input type="text" name="productOption" value={formState.productOption} onChange={handleFormChange} className={inputClass} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className={labelClass}>키워드</label>
+                                    <input type="text" name="keywords" value={formState.keywords} onChange={handleFormChange} className={inputClass} placeholder="1개만 입력" />
+                                </div>
+                                <div className="col-span-2">
+                                    <label className={labelClass}>상품 URL</label>
+                                    <input type="url" name="productUrl" value={formState.productUrl} onChange={handleFormChange} className={inputClass} placeholder="https://..." />
+                                </div>
+                            </div>
+                            <div className="flex justify-end">
+                                <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md">견적에 추가</button>
+                            </div>
                         </div>
                         <div>
-                            <label className={labelClass}>구분</label>
-                            <select name="deliveryType" value={formState.deliveryType} onChange={handleFormChange} className={inputClass}>
-                                <option value="실배송">실배송</option>
-                                <option value="빈박스">빈박스</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className={labelClass}>리뷰 종류</label>
-                            <select name="reviewType" value={formState.reviewType} onChange={handleFormChange} className={inputClass}>
-                                {formState.deliveryType === '실배송' ? (
-                                    <> <option>별점</option><option>텍스트</option><option>포토</option><option>프리미엄(포토)</option><option>프리미엄(영상)</option> </>
-                                ) : (
-                                    <> <option>별점</option><option>텍스트</option> </>
-                                )}
-                            </select>
-                        </div>
-                        <div>
-                            <label className={labelClass}>작업 개수</label>
-                            <input type="number" name="quantity" value={formState.quantity} onChange={handleFormChange} className={inputClass} min="1" required />
-                        </div>
-                        <div className="md:col-span-2 xl:col-span-1">
-                            <label className={labelClass}>상품명</label>
-                            <input type="text" name="productName" value={formState.productName} onChange={handleFormChange} className={inputClass} placeholder="예: 저자극 샴푸" required />
-                        </div>
-                        <div>
-                            <label className={labelClass}>옵션</label>
-                            <input type="text" name="productOption" value={formState.productOption} onChange={handleFormChange} className={inputClass} placeholder="예: 500ml 1개" />
-                        </div>
-                        <div>
-                            <label className={labelClass}>상품가 (개당)</label>
-                            <input type="number" name="productPrice" value={formState.productPrice} onChange={handleFormChange} className={inputClass} placeholder="0" />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className={labelClass}>상품 URL</label>
-                            <input type="url" name="productUrl" value={formState.productUrl} onChange={handleFormChange} className={inputClass} placeholder="https://..." />
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className={labelClass}>키워드</label>
-                            <input type="text" name="keywords" value={formState.keywords} onChange={handleFormChange} className={inputClass} placeholder="1개만 입력" />
-                        </div>
-                        <div className="md:col-span-2">
                             <label className={labelClass}>리뷰 가이드</label>
-                            <textarea name="reviewGuide" value={formState.reviewGuide} onChange={handleFormChange} className={inputClass} rows="2"></textarea>
-                        </div>
-                        <div className="md:col-span-2">
-                            <label className={labelClass}>비고</label>
-                            <input type="text" name="remarks" value={formState.remarks} onChange={handleFormChange} className={inputClass} />
-                        </div>
-                        <div className="md:col-span-full xl:col-span-1 flex items-end">
-                            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md">
-                                견적에 추가
-                            </button>
+                            <textarea name="reviewGuide" value={formState.reviewGuide} onChange={handleFormChange} disabled={formState.reviewType === '별점'} className={inputClass + ' h-48'} />
                         </div>
                     </div>
 
@@ -305,13 +400,13 @@ export default function DashboardPage() {
                                 ) : (
                                     campaigns.map((c, index) => {
                                         // ✅ [추가] 항목별 최종 결제액 및 수수료 계산
-                                        const finalItemAmount = Math.round(c.itemTotal * 1.14);
+                                        const finalItemAmount = Math.round(c.itemTotal * 1.10);
                                         const commission = finalItemAmount - c.itemTotal;
 
                                         return (
                                             <tr key={c.id}>
                                                 <td className={tdClass}>{index + 1}</td>
-                                                <td className={tdClass}><span className={c.date.getDay() === 0 ? 'text-red-500 font-bold' : ''}>{new Date(c.date).toLocaleDateString()}</span></td>
+                                                <td className={tdClass}><span className={c.date.getDay() === 0 ? 'text-red-500 font-bold' : ''}>{formatDateWithDay(new Date(c.date))}</span></td>
                                                 <td className={tdClass}>{c.deliveryType}/{c.reviewType}</td>
                                                 <td className={tdClass}>{c.productName}</td>
                                                 <td className={tdClass}>{Number(c.productPrice).toLocaleString()}원</td>
@@ -342,8 +437,8 @@ export default function DashboardPage() {
                              <p className="text-md">
                                 견적 합계: <span className="font-semibold">{quoteTotal.toLocaleString()}</span> 원
                             </p>
-                             <p className="text-md">
-                                세금계산서 (10%) + 매입수수료 (4%): <span className="font-semibold">{totalCommission.toLocaleString()}</span> 원
+                            <p className="text-md">
+                                세금계산서 (10%): <span className="font-semibold">{totalCommission.toLocaleString()}</span> 원
                             </p>
                             <p className="text-lg font-bold">
                                 총 결제 금액: <span className="font-bold text-blue-600">{totalAmount.toLocaleString()}</span> 원
@@ -364,7 +459,7 @@ export default function DashboardPage() {
                         </div>
                         <button onClick={handleProcessPayment} disabled={campaigns.length === 0}
                             className="mt-4 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-8 rounded-lg text-lg shadow-lg disabled:bg-gray-400 disabled:cursor-not-allowed">
-                            결제 진행
+                            입금하기
                         </button>
                     </div>
                 </div>
@@ -379,7 +474,7 @@ export default function DashboardPage() {
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {savedCampaigns.length === 0 ? (<tr><td colSpan="5" className="text-center py-10 text-gray-500">예약 내역이 없습니다.</td></tr>) : (savedCampaigns.map(c => (
                                     <tr key={c.id}>
-                                        <td className={tdClass}>{c.date?.seconds ? new Date(c.date.seconds * 1000).toLocaleDateString() : '-'}</td><td className={tdClass}>{c.productName}</td>
+                                        <td className={tdClass}>{c.date?.seconds ? formatDateWithDay(new Date(c.date.seconds * 1000)) : '-'}</td><td className={tdClass}>{c.productName}</td>
                                         <td className={tdClass}>{c.reviewType}</td><td className={tdClass}>{c.itemTotal?.toLocaleString()}원</td>
                                         <td className={tdClass}><span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${c.status === '예약 확정' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>{c.status}</span></td>
                                     </tr>)))}
@@ -391,7 +486,7 @@ export default function DashboardPage() {
 
             {/* ✅ [추가] 단가표 모달 */}
             {isPriceModalOpen && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50"
                     onClick={() => setIsPriceModalOpen(false)} // 배경 클릭 시 닫기
                 >
@@ -443,6 +538,16 @@ export default function DashboardPage() {
                                 닫기
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {showDepositPopup && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowDepositPopup(false)}>
+                    <div className="bg-white p-6 rounded shadow" onClick={(e) => e.stopPropagation()}>
+                        <p className="font-semibold text-lg mb-2">채종문(아이언마운틴컴퍼니)</p>
+                        <p className="font-semibold text-lg">국민은행 834702-04-290385</p>
+                        <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded" onClick={() => setShowDepositPopup(false)}>확인</button>
                     </div>
                 </div>
             )}
