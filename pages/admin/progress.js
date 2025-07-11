@@ -1,35 +1,25 @@
 import { useEffect, useState } from 'react';
-import SellerLayout from '../../components/seller/SellerLayout';
-import { db, auth } from '../../lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { useAuthState } from 'react-firebase-hooks/auth';
+import AdminLayout from '../../components/admin/AdminLayout';
+import withAdminAuth from '../../hoc/withAdminAuth';
+import { db } from '../../lib/firebase';
+import { collection, query, where, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 
-export default function ProgressPage() {
-  const [user] = useAuthState(auth);
+function AdminProgress() {
   const [campaigns, setCampaigns] = useState([]);
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
 
   useEffect(() => {
-    if (!user) return;
     const q = query(
       collection(db, 'campaigns'),
-      where('sellerUid', '==', user.uid),
       where('status', '==', '예약 확정')
     );
     const unsubscribe = onSnapshot(q, (snap) => {
       setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsubscribe();
-  }, [user]);
-
-  const getStatus = (c) => {
-    if (c.status === '리뷰완료') return '리뷰완료';
-    if (c.status === '구매완료') return '구매완료';
-    const d = c.date?.seconds ? new Date(c.date.seconds * 1000) : new Date(c.date);
-    return new Date() < d ? '진행전' : '진행중';
-  };
+  }, []);
 
   const filteredCampaigns = campaigns
     .filter(c => {
@@ -58,14 +48,21 @@ export default function ProgressPage() {
 
   const months = [1,2,3,4,5,6,7,8,9,10,11,12];
 
-  // 캠페인 수량만큼 행을 확장합니다.
   const expandedCampaigns = filteredCampaigns.flatMap(c => {
     const qty = Number(c.quantity) || 1;
     return Array.from({ length: qty }, () => c);
   });
 
+  const updatePaymentType = async (id, value) => {
+    try {
+      await updateDoc(doc(db, 'campaigns', id), { paymentType: value });
+    } catch (err) {
+      console.error('결제유형 업데이트 오류:', err);
+    }
+  };
+
   return (
-    <SellerLayout>
+    <AdminLayout>
       <div className="flex items-center mb-4 space-x-2">
         <select value={year} onChange={e => setYear(Number(e.target.value))} className="border p-1 rounded">
           {years.length === 0 ? <option>{year}</option> : years.map(y => <option key={y} value={y}>{y}</option>)}
@@ -91,7 +88,17 @@ export default function ProgressPage() {
                 <td className="px-2 py-2">{idx + 1}</td>
                 <td className="px-2 py-2">{d.toLocaleDateString()}</td>
                 <td className="px-2 py-2">{c.deliveryType}</td>
-                <td className="px-2 py-2">{c.paymentType || '-'}</td>
+                <td className="px-2 py-2">
+                  <select
+                    value={c.paymentType || ''}
+                    onChange={e => updatePaymentType(c.id, e.target.value)}
+                    className="border p-1 rounded"
+                  >
+                    <option value="">선택</option>
+                    <option value="현영">현영</option>
+                    <option value="자율결제">자율결제</option>
+                  </select>
+                </td>
                 <td className="px-2 py-2">{c.reviewType}</td>
                 <td className="px-2 py-2">{idx + 1}</td>
                 <td className="px-2 py-2">{c.productName}</td>
@@ -113,6 +120,8 @@ export default function ProgressPage() {
           )}
         </tbody>
       </table>
-    </SellerLayout>
+    </AdminLayout>
   );
 }
+
+export default withAdminAuth(AdminProgress);
