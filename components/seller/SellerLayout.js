@@ -67,7 +67,7 @@ export default function SellerLayout({ children }) {
                 onClick={() => toggle('kita')}
                 className="w-full text-left hover:bg-gray-700 p-2 rounded flex justify-between items-center"
               >
-                키타
+                기타
                 <span>{open.kita ? '-' : '+'}</span>
               </button>
               {open.kita && (

@@ -64,7 +64,6 @@ export default function TrafficPage() {
         return;
     }
     
-    // 사용자의 트래픽 요청 내역 불러오기
     const q = query(collection(db, "traffic_requests"), where("sellerUid", "==", user.uid));
     const unsubscribeRequests = onSnapshot(q, (snapshot) => {
         const sortedData = snapshot.docs
@@ -74,7 +73,6 @@ export default function TrafficPage() {
         setIsLoadingDB(false);
     });
 
-    // 사용자 예치금 정보 불러오기
     const sellerDocRef = doc(db, 'sellers', user.uid);
     const unsubscribeSeller = onSnapshot(sellerDocRef, (doc) => {
         if (doc.exists()) {
@@ -132,19 +130,25 @@ export default function TrafficPage() {
     try {
         await batch.commit();
         setShowDepositPopup(true);
-        setProducts(
-            initialTrafficProducts.map(p => ({
-              ...p,
-              salePrice: Math.round(p.retailPrice * (1 - p.discountRate)),
-              quantity: 0,
-              requestDate: null,
-            }))
-        );
-        setUseDeposit(false);
+        // ✅ [수정] 폼 초기화 로직을 여기서 제거합니다.
     } catch (error) {
         console.error('결제 처리 중 오류 발생:', error);
         alert('결제 처리 중 오류가 발생했습니다.');
     }
+  };
+
+  // ✅ [추가] 팝업을 닫고 폼을 초기화하는 함수를 새로 만듭니다.
+  const handleClosePopupAndReset = () => {
+    setShowDepositPopup(false);
+    setProducts(
+        initialTrafficProducts.map(p => ({
+          ...p,
+          salePrice: Math.round(p.retailPrice * (1 - p.discountRate)),
+          quantity: 0,
+          requestDate: null,
+        }))
+    );
+    setUseDeposit(false);
   };
 
   const handleDepositChange = async (id, checked) => {
@@ -168,7 +172,6 @@ export default function TrafficPage() {
       setConfirmRequest(null);
   };
 
-  // --- 계산 로직 ---
   const quoteTotal = products.reduce((sum, p) => sum + (p.salePrice * p.quantity), 0);
   const totalCommission = Math.round(quoteTotal * 0.1);
   const totalAmount = quoteTotal + totalCommission;
@@ -185,6 +188,7 @@ export default function TrafficPage() {
   return (
     <SellerLayout>
       <div className="p-4 md:p-8 bg-gray-50 min-h-screen">
+        {/* ... 페이지 상단 내용은 동일 ... */}
         <h1 className="text-3xl font-bold text-gray-800 mb-2">트래픽 요청서</h1>
         <div className="mb-8 p-4 bg-blue-50 border-l-4 border-blue-400 text-gray-700 rounded-r-lg">
           <ul className="list-disc list-inside space-y-2 text-sm">
@@ -198,6 +202,7 @@ export default function TrafficPage() {
             <h2 className="text-2xl font-bold mb-4 text-gray-700 p-6">트래픽 견적 요청 (스프레드시트)</h2>
             <div className="overflow-x-auto">
                 <table className="min-w-full">
+                    {/* ... 테이블 헤더 내용은 동일 ... */}
                     <thead>
                     <tr>
                         <th className={`${thClass} w-40`}>구분</th>
@@ -223,13 +228,11 @@ export default function TrafficPage() {
 
                         return (
                         <tr key={index} className={isFirstOfCategory && index > 0 ? 'border-t-2 border-gray-300' : ''}>
-                            
                             {isFirstOfCategory && (
                             <td rowSpan={rowSpanCount} className={`${tdClass} align-middle text-center font-bold bg-gray-50`}>
                                 {p.category}
                             </td>
                             )}
-
                             <td className={`${tdClass} font-semibold`}>{p.name}</td>
                             <td className={tdClass}>{p.description}</td>
                             <td className={`${tdClass} text-xs`}>
@@ -273,6 +276,7 @@ export default function TrafficPage() {
                     </tbody>
                 </table>
             </div>
+            {/* ... 결제 정보 부분은 동일 ... */}
             <div className="mt-6 p-6 border-t border-gray-200 text-right">
                 <div className="space-y-2 mb-4 text-gray-700">
                     <p className="text-md">견적 합계: <span className="font-semibold">{quoteTotal.toLocaleString()}</span> 원</p>
@@ -300,6 +304,7 @@ export default function TrafficPage() {
             </div>
         </div>
         
+        {/* ... 나의 트래픽 예약 내역 부분은 동일 ... */}
         <div className="mt-8 p-6 bg-white rounded-xl shadow-lg">
             <h2 className="text-2xl font-bold mb-4 text-gray-700">나의 트래픽 예약 내역 (DB 저장 완료)</h2>
             <div className="overflow-x-auto">
@@ -352,6 +357,7 @@ export default function TrafficPage() {
         </div>
       </div>
         
+        {/* ... 예약확정 팝업은 동일 ... */}
         {confirmRequest && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setConfirmRequest(null)}>
                 <div className="bg-white p-6 rounded shadow" onClick={(e) => e.stopPropagation()}>
@@ -364,8 +370,9 @@ export default function TrafficPage() {
             </div>
         )}
 
+        {/* ✅ [수정] 입금 계좌 안내 팝업의 onClick 핸들러를 수정합니다. */}
         {showDepositPopup && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowDepositPopup(false)}>
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleClosePopupAndReset}>
                 <div className="bg-white p-8 rounded-lg shadow-xl text-center" onClick={(e) => e.stopPropagation()}>
                     <h3 className="text-xl font-bold mb-4">입금 계좌 안내</h3>
                     <p className="text-lg">아래 계좌로 <strong className="text-green-600">{remainingPayment.toLocaleString()}원</strong>을 입금해주세요.</p>
@@ -374,7 +381,7 @@ export default function TrafficPage() {
                         <p className="font-semibold text-2xl text-blue-700">국민은행 834702-04-290385</p>
                     </div>
                     <p className="text-sm text-gray-600 mb-6">입금 확인 후 '나의 트래픽 예약 내역'에서 상태가 변경됩니다.</p>
-                    <button className="w-full px-4 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700" onClick={() => setShowDepositPopup(false)}>확인</button>
+                    <button className="w-full px-4 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700" onClick={handleClosePopupAndReset}>확인</button>
                 </div>
             </div>
         )}
