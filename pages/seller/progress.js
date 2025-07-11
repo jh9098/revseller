@@ -97,7 +97,7 @@ export default function ProgressPage() {
                 <td className="px-2 py-2">{c.productName}</td>
                 <td className="px-2 py-2">{c.productOption}</td>
                 <td className="px-2 py-2">{Number(c.productPrice).toLocaleString()}</td>
-                <td className="px-2 py-2 break-all"><a href={c.productUrl} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{c.productUrl}</a></td>
+                <td className="px-2 py-2 break-all"><a href={c.productUrl} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">바로가기</a></td>
                 <td className="px-2 py-2">{c.keywords}</td>
                 <td className="px-2 py-2">-</td>
                 <td className="px-2 py-2">-</td>
