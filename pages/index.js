@@ -6,8 +6,9 @@ import { useRouter } from 'next/router';
 
 export default function LoginPage() {
   // 로그인용 state
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginId, setLoginId] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showSignup, setShowSignup] = useState(false);
 
   // 회원가입용 state (요청 순서에 맞게 새로 정의)
   const [username, setUsername] = useState(''); // ID
@@ -32,8 +33,11 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     try {
-      // 로그인 시에는 이메일과 비밀번호를 사용합니다.
-      await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      const q = query(collection(db, 'sellers'), where('username', '==', loginId));
+      const snap = await getDocs(q);
+      if (snap.empty) throw new Error('존재하지 않는 ID입니다.');
+      const { email } = snap.docs[0].data();
+      await signInWithEmailAndPassword(auth, email, loginPassword);
       router.push('/dashboard/products');
     } catch (error) {
       alert(`로그인 실패: ${error.message}`);
@@ -124,12 +128,14 @@ export default function LoginPage() {
           {/* 로그인 폼 */}
           <div style={{ border: '1px solid #ccc', padding: '20px', marginBottom: '20px' }}>
             <h2>로그인</h2>
-            <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} placeholder="이메일" style={{ width: '100%', padding: '8px', marginBottom: '10px' }} />
+            <input value={loginId} onChange={(e) => setLoginId(e.target.value)} placeholder="ID" style={{ width: '100%', padding: '8px', marginBottom: '10px' }} />
             <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} placeholder="비밀번호" style={{ width: '100%', padding: '8px', marginBottom: '10px' }} />
-            <button onClick={handleLogin} style={{ width: '100%', padding: '10px' }}>로그인</button>
+            <button onClick={handleLogin} style={{ width: '100%', padding: '10px', marginBottom: '10px' }}>로그인</button>
+            <button onClick={() => setShowSignup(!showSignup)} style={{ width: '100%', padding: '10px' }}>회원가입</button>
           </div>
 
-          {/* 회원가입 폼 (순서 변경 완료) */}
+          {/* 회원가입 폼 */}
+          {showSignup && (
           <div style={{ border: '1px solid #ccc', padding: '20px' }}>
             <h2>회원가입 및 사업자 인증</h2>
             <form onSubmit={handleSignUpAndVerify}>
@@ -146,6 +152,7 @@ export default function LoginPage() {
               </button>
             </form>
           </div>
+          )}
         </>
       )}
     </div>
